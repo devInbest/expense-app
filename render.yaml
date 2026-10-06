@@ -1,0 +1,93 @@
+# Render Blueprint - Expense App (pnpm + Turborepo monorepo)
+#
+# Before deploy:
+# 1. Set MONGODB_URI on expense-api and expense-cron (Render Dashboard -> Environment).
+# 2. In MongoDB Atlas -> Network Access, allow 0.0.0.0/0 (or Render egress IPs).
+# 3. Set SMS, Google and storage credentials (sync: false keys below).
+# 4. After first deploy, set ADMIN_URL on expense-api and VITE_API_URL on
+#    expense-admin to the actual onrender.com URLs Render assigns.
+# The mobile app is built and shipped with EAS (see apps/mobile/eas.json), not Render.
+
+envVarGroups:
+  - name: expense-shared
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: ADMIN_JWT_SECRET
+        generateValue: true
+      - key: MONGODB_URI
+        sync: false
+      - key: SMS_PROVIDER
+        value: console
+      - key: SMS_API_KEY
+        sync: false
+      - key: SMS_SENDER_ID
+        sync: false
+      - key: GOOGLE_CLIENT_IDS
+        sync: false
+      - key: STORAGE_BUCKET
+        sync: false
+      - key: STORAGE_REGION
+        sync: false
+      - key: STORAGE_ENDPOINT
+        sync: false
+      - key: STORAGE_ACCESS_KEY_ID
+        sync: false
+      - key: STORAGE_SECRET_ACCESS_KEY
+        sync: false
+      - key: STORAGE_PUBLIC_URL
+        sync: false
+      - key: EXPO_ACCESS_TOKEN
+        sync: false
+
+services:
+  - type: web
+    name: expense-api
+    runtime: node
+    plan: starter
+    region: singapore
+    branch: main
+    autoDeploy: true
+    buildCommand: pnpm install --frozen-lockfile && pnpm --filter @expense/api build
+    startCommand: pnpm --filter @expense/api start
+    healthCheckPath: /api/v1/health
+    envVars:
+      - fromGroup: expense-shared
+      - key: SUPERADMIN_PASSWORD
+        sync: false
+      - key: ADMIN_URL
+        value: https://expense-admin.onrender.com
+      - key: APP_LINK_BASE
+        value: https://expense-api.onrender.com
+
+  - type: web
+    name: expense-admin
+    runtime: static
+    branch: main
+    autoDeploy: true
+    buildCommand: pnpm install --frozen-lockfile && pnpm --filter @expense/admin build
+    staticPublishPath: apps/admin/dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_URL
+        value: https://expense-api.onrender.com/api/v1
+
+  # Recurring transactions, budget alerts, invite expiry and daily stats.
+  - type: cron
+    name: expense-cron
+    runtime: node
+    plan: starter
+    region: singapore
+    schedule: '*/15 * * * *'
+    branch: main
+    buildCommand: pnpm install --frozen-lockfile && pnpm --filter @expense/api build
+    startCommand: pnpm --filter @expense/api cron:prod
+    envVars:
+      - fromGroup: expense-shared

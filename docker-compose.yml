@@ -1,0 +1,45 @@
+services:
+  mongo:
+    image: mongo:7
+    container_name: expense-mongo
+    restart: unless-stopped
+    ports:
+      - '27017:27017'
+    volumes:
+      - mongo-data:/data/db
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: expense-api
+    restart: unless-stopped
+    ports:
+      - '5099:5099'
+    environment:
+      NODE_ENV: production
+      PORT: 5099
+      MONGODB_URI: ${MONGODB_URI:-mongodb://mongo:27017/expense_app_db}
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-change-me-refresh}
+      ADMIN_JWT_SECRET: ${ADMIN_JWT_SECRET:-change-me-admin}
+      ADMIN_URL: http://localhost:8099
+      SMS_PROVIDER: console
+    depends_on:
+      - mongo
+
+  admin:
+    build:
+      context: .
+      dockerfile: apps/admin/Dockerfile
+      args:
+        VITE_API_URL: http://localhost:5099/api/v1
+    container_name: expense-admin
+    restart: unless-stopped
+    ports:
+      - '8099:80'
+    depends_on:
+      - api
+
+volumes:
+  mongo-data:

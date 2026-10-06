@@ -1,0 +1,10 @@
+{
+  "extends": "@expense/tsconfig/react.json",
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": false,
+    "baseUrl": ".",
+    "paths": { "@/*": ["./src/*"] }
+  },
+  "include": ["src"]
+}

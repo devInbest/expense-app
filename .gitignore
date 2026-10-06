@@ -1,0 +1,25 @@
+node_modules/
+dist/
+build/
+.turbo/
+.env
+.env.local
+*.log
+uploads/
+.DS_Store
+coverage/
+.idea/
+.vscode/
+*.local
+*.tsbuildinfo
+
+# Expo
+.expo/
+web-build/
+apps/mobile/ios/
+apps/mobile/android/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision

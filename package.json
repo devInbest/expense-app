@@ -1,0 +1,28 @@
+{
+  "name": "expense-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Expense tracker - mobile app, API and admin portal",
+  "packageManager": "pnpm@10.18.3",
+  "scripts": {
+    "dev": "turbo run dev --filter=@expense/api --filter=@expense/admin",
+    "dev:api": "pnpm --filter @expense/api dev",
+    "dev:admin": "pnpm --filter @expense/admin dev",
+    "dev:mobile": "pnpm --filter @expense/mobile start",
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "cron": "pnpm --filter @expense/api cron"
+  },
+  "devDependencies": {
+    "@expense/eslint-config": "workspace:*",
+    "eslint": "^9.37.0",
+    "turbo": "^2.5.8",
+    "typescript": "~5.9.3"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  }
+}
