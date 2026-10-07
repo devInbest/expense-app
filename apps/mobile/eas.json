@@ -20,7 +20,10 @@
       "distribution": "internal",
       "channel": "preview",
       "android": { "buildType": "apk" },
-      "env": { "APP_VARIANT": "preview" }
+      "env": {
+        "APP_VARIANT": "preview",
+        "EXPO_PUBLIC_API_URL": "https://expense-api-uwo5.onrender.com/api/v1"
+      }
     },
     "production": {
       "extends": "base",
