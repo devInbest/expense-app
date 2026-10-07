@@ -5,11 +5,12 @@ const isProd = variant === 'production';
 const suffix = isProd ? '' : `.${variant}`;
 
 const googleIosUrlScheme = process.env.GOOGLE_IOS_URL_SCHEME;
-const easProjectId = process.env.EAS_PROJECT_ID;
+const easProjectId = process.env.EAS_PROJECT_ID || 'f63a4900-0a5a-474a-a434-db2f96f2bc71';
 
 const config: ExpoConfig = {
   name: isProd ? 'Expense' : `Expense (${variant})`,
   slug: 'expense-app',
+  owner: 'ash.0167',
   version: '1.0.0',
   orientation: 'portrait',
   icon: './assets/images/icon.png',
