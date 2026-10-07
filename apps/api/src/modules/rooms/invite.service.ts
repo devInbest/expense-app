@@ -89,7 +89,7 @@ export const createInvite = async (roomId: string, actor: UserDoc, input: Create
     const link = buildInviteLink(env.appLinkBase, room.inviteCode);
     sendSms({
       to: phone,
-      text: `${actor.name || 'A friend'} invited you to "${room.name}" on Expense App to track shared expenses. Join: ${link}`,
+      text: `${actor.name || 'A friend'} invited you to "${room.name}" on expenseHog to track shared expenses. Join: ${link}`,
       templateId: env.sms.inviteTemplateId || undefined,
       vars: { name: actor.name || 'A friend', room: room.name, link },
     }).catch((err) => console.error('Invite SMS failed:', err.message));

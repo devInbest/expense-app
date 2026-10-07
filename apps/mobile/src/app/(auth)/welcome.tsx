@@ -40,7 +40,7 @@ export default function Welcome() {
           }}>
           <Icon name="wallet-outline" size={48} color={colors.onPrimary} />
         </View>
-        <AppText variant="title">Expense</AppText>
+        <AppText variant="title">expenseHog</AppText>
         <AppText muted style={{ textAlign: 'center', maxWidth: 300 }}>
           Track your daily spending, set budgets, and split shared costs with friends and family.
         </AppText>

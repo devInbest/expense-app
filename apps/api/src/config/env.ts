@@ -84,3 +84,13 @@ export const env = {
 
   expoAccessToken: process.env.EXPO_ACCESS_TOKEN || '',
 };
+
+const requiredSmsVars: Record<typeof env.sms.provider, string[]> = {
+  console: [],
+  msg91: ['SMS_API_KEY', 'SMS_SENDER_ID', 'SMS_TEMPLATE_ID'],
+  twilio: ['TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_FROM'],
+};
+const smsRequired = requiredSmsVars[env.sms.provider];
+if (!smsRequired) throw new Error(`SMS_PROVIDER must be one of: ${Object.keys(requiredSmsVars).join(', ')}`);
+const smsMissing = smsRequired.filter((key) => !process.env[key]?.trim());
+if (smsMissing.length) throw new Error(`SMS_PROVIDER=${env.sms.provider} needs ${smsMissing.join(', ')}`);

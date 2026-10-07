@@ -112,7 +112,7 @@ export default function BroadcastPage() {
                 <IconBell size={18} />
               </div>
               <div className="min-w-0">
-                <p className="text-xs text-white/60">Expense App · now</p>
+                <p className="text-xs text-white/60">expenseHog · now</p>
                 <p className="font-semibold truncate">{title || 'Notification title'}</p>
                 <p className="text-sm text-white/80 break-words">{body || 'Your message appears here.'}</p>
               </div>

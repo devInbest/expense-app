@@ -31,7 +31,7 @@ export const requestOtp = async (phone: string, purpose: OtpPurpose, ip?: string
 
   await sendSms({
     to: phone,
-    text: `${code} is your Expense App verification code. It expires in ${LIMITS.OTP_TTL_SECONDS / 60} minutes. Do not share it with anyone.`,
+    text: `${code} is your expenseHog verification code. It expires in ${LIMITS.OTP_TTL_SECONDS / 60} minutes. Do not share it with anyone.`,
     vars: { otp: code },
   });
 

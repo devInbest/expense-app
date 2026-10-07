@@ -57,10 +57,17 @@ export default function Sidebar({ isOpen = true }: { isOpen?: boolean }) {
       }`}
     >
       <div className={`flex h-14 flex-shrink-0 flex-col items-center justify-center border-b border-white/10 ${isOpen ? 'px-3' : 'px-2'}`}>
-        <div className="flex w-full min-w-0 items-center justify-center gap-2">
-          <img src="/logo.svg" alt="Expense Admin" className="h-7 w-7 flex-shrink-0 object-contain" />
-          {isOpen && <span className="truncate text-lg font-semibold tracking-wide text-white">Expense Admin</span>}
-        </div>
+        <NavLink to={ROUTES.HOME} className="flex w-full min-w-0 items-center justify-center" aria-label="ExpenseHog home">
+          {isOpen ? (
+            <img
+              src="/expensehog-logo.png"
+              alt="ExpenseHog"
+              className="h-8 w-auto max-w-full object-contain drop-shadow-[0_1px_2px_rgba(0,0,0,0.35)]"
+            />
+          ) : (
+            <img src="/favicon.png" alt="ExpenseHog" className="h-10 w-10 flex-shrink-0 object-contain" />
+          )}
+        </NavLink>
       </div>
 
       <nav className={`flex-1 overflow-x-hidden overflow-y-auto py-4 space-y-1 ${isOpen ? 'px-3' : 'px-2'}`}>

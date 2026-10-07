@@ -87,7 +87,7 @@ export default function NewRoom() {
   });
 
   return (
-    <Screen edges={['bottom']}>
+    <Screen edges={['bottom']} contentStyle={{ paddingBottom: spacing.lg }}>
       <Field label="Room name" value={name} onChangeText={setName} placeholder="e.g. Goa trip, Flat 302" maxLength={60} autoFocus />
       <Section title="Type">
         {TYPES.map((t) => {

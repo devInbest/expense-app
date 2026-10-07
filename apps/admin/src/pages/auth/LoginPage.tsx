@@ -61,8 +61,8 @@ export default function LoginPage() {
       <div className="login-page__content w-full max-w-md">
         <div className="bg-transparent border-2 border-white/20 backdrop-blur-[13px] px-6 py-8 rounded-xl shadow-[0_0_10px_rgba(0,0,0,0.1)]">
           <div className="text-center mb-4">
-            <img src="/logo.svg" alt="" className="w-16 h-16 object-contain inline-block mb-4" />
-            <p className="text-white/90 text-lg mt-1">Expense Admin</p>
+            <img src="/expensehog-logo.png" alt="expenseHog" className="h-12 w-auto object-contain inline-block mb-3" />
+            <p className="text-white/90 text-lg mt-1">Admin Panel</p>
           </div>
           <h2 className="text-2xl font-bold text-white mb-6 text-center">Sign In</h2>
 

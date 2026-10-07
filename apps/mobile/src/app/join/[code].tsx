@@ -3,7 +3,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect } from 'react';
 import { View } from 'react-native';
 import { qk } from '@expense/api-client';
-import { AppText, Button, Card, EmptyState, Icon, Loading, Screen } from '@/components/ui';
+import { AppText, Button, Card, EmptyState, Icon, Loading, Screen, Spacer } from '@/components/ui';
 import { trackFeature } from '@/lib/analytics';
 import { api, errorMessage } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
@@ -52,7 +52,7 @@ export default function JoinRoom() {
   const room = preview.data!;
 
   return (
-    <Screen edges={[]}>
+    <Screen edges={['bottom']} scroll={false}>
       <Card style={{ alignItems: 'center', gap: spacing.md, paddingVertical: spacing.xxl }}>
         <View style={{ width: 72, height: 72, borderRadius: 24, backgroundColor: colors.primaryMuted, alignItems: 'center', justifyContent: 'center' }}>
           <Icon name={room.icon} size={36} color={colors.primary} />
@@ -62,16 +62,17 @@ export default function JoinRoom() {
           {room.type === 'split' ? 'Split expenses' : 'Shared budget'} · {room.memberCount} member{room.memberCount > 1 ? 's' : ''}
         </AppText>
       </Card>
-      {room.alreadyMember ? (
-        <Button title="Open room" onPress={() => router.replace({ pathname: '/room/[id]', params: { id: room._id } })} />
-      ) : (
-        <Button title="Join room" onPress={() => join.mutate()} loading={join.isPending} />
-      )}
+      <Spacer />
       {join.error ? (
         <AppText color={colors.danger} style={{ textAlign: 'center' }}>
           {errorMessage(join.error)}
         </AppText>
       ) : null}
+      {room.alreadyMember ? (
+        <Button title="Open room" onPress={() => router.replace({ pathname: '/room/[id]', params: { id: room._id } })} />
+      ) : (
+        <Button title="Join room" onPress={() => join.mutate()} loading={join.isPending} />
+      )}
     </Screen>
   );
 }

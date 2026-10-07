@@ -1,6 +1,6 @@
 import type { ExpoConfig } from 'expo/config';
 
-const variant = process.env.APP_VARIANT ?? 'development';
+const variant = process.env.APP_VARIANT === 'production' ? 'production' : 'preview';
 const isProd = variant === 'production';
 const suffix = isProd ? '' : `.${variant}`;
 
@@ -8,7 +8,7 @@ const googleIosUrlScheme = process.env.GOOGLE_IOS_URL_SCHEME;
 const easProjectId = process.env.EAS_PROJECT_ID || 'f63a4900-0a5a-474a-a434-db2f96f2bc71';
 
 const config: ExpoConfig = {
-  name: isProd ? 'Expense' : `Expense (${variant})`,
+  name: isProd ? 'expenseHog' : `expenseHog (${variant})`,
   slug: 'expense-app',
   owner: 'ash.0167',
   version: '1.0.0',
@@ -19,7 +19,6 @@ const config: ExpoConfig = {
   runtimeVersion: { policy: 'appVersion' },
   ios: {
     bundleIdentifier: `com.expenseapp${suffix}`,
-    icon: './assets/expo.icon',
     supportsTablet: false,
     infoPlist: {
       NSPhotoLibraryUsageDescription: 'Attach receipt photos to your expenses.',
@@ -31,7 +30,7 @@ const config: ExpoConfig = {
   android: {
     package: `com.expenseapp${suffix}`,
     adaptiveIcon: {
-      backgroundColor: '#E6F4FE',
+      backgroundColor: '#141414',
       foregroundImage: './assets/images/android-icon-foreground.png',
       backgroundImage: './assets/images/android-icon-background.png',
       monochromeImage: './assets/images/android-icon-monochrome.png',
@@ -57,9 +56,14 @@ const config: ExpoConfig = {
     [
       'expo-splash-screen',
       {
-        backgroundColor: '#4F46E5',
+        backgroundColor: '#FFFFFF',
         image: './assets/images/splash-icon.png',
-        imageWidth: 76,
+        imageWidth: 240,
+        resizeMode: 'contain',
+        dark: {
+          backgroundColor: '#FFFFFF',
+          image: './assets/images/splash-icon.png',
+        },
       },
     ],
     'expo-secure-store',

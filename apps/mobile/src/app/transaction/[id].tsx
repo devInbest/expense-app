@@ -102,7 +102,7 @@ function NewTransactionForm() {
   };
 
   return (
-    <Screen edges={['bottom']}>
+    <Screen edges={['bottom']} contentStyle={{ paddingBottom: spacing.lg }}>
       <Stack.Screen options={{ title: 'Add transaction' }} />
       <Segmented
         options={[

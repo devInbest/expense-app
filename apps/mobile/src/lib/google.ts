@@ -25,7 +25,7 @@ export const isGoogleConfigured = () => Boolean(config.googleWebClientId);
 /** Returns an ID token for the API, or null if the user cancelled. */
 export const getGoogleIdToken = async (): Promise<string | null> => {
   const m = load();
-  if (!m) throw new Error('Google sign-in needs a development build of the app.');
+  if (!m) throw new Error("Google sign-in isn't available in Expo Go. Use the installed preview or production app.");
   await m.GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
   const res = await m.GoogleSignin.signIn();
   if (!m.isSuccessResponse(res)) return null;

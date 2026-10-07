@@ -1,7 +1,6 @@
 {
   "extends": "@expense/tsconfig/node.json",
   "compilerOptions": {
-    "baseUrl": ".",
     "types": ["node"]
   },
   "include": ["src", "test", "tsup.config.ts", "vitest.config.ts"]
