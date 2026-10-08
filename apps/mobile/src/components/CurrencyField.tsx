@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { CURRENCIES, getCurrency } from '@expense/shared';
-import { radius, spacing, useTheme } from '@/theme';
+import { spacing, useTheme } from '@/theme';
 import { SelectModal } from './finance';
-import { AppText, Icon } from './ui';
+import { AppText, Icon, useFieldBoxStyle } from './ui';
 
 export function CurrencyField({
   label = 'Currency',
@@ -19,35 +19,27 @@ export function CurrencyField({
   hint?: string;
 }) {
   const { colors } = useTheme();
+  const box = useFieldBoxStyle();
   const [open, setOpen] = useState(false);
   const info = getCurrency(value);
   return (
     <View style={{ gap: spacing.xs }}>
-      <AppText variant="caption" muted>
+      <AppText variant="caption" muted style={{ fontWeight: '600', paddingHorizontal: spacing.xs }}>
         {label}
       </AppText>
-      <Pressable
-        disabled={disabled}
-        onPress={() => setOpen(true)}
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: spacing.sm,
-          backgroundColor: colors.surface,
-          borderWidth: 1,
-          borderColor: colors.border,
-          borderRadius: radius.md,
-          padding: spacing.md,
-          opacity: disabled ? 0.6 : 1,
-        }}>
-        <AppText style={{ width: 28 }}>{info.symbol}</AppText>
-        <AppText style={{ flex: 1 }}>
+      <Pressable disabled={disabled} onPress={() => setOpen(true)} style={({ pressed }) => [box, { opacity: disabled ? 0.6 : pressed ? 0.75 : 1 }]}>
+        <View style={{ width: 30, height: 30, borderRadius: 10, backgroundColor: colors.primaryMuted, alignItems: 'center', justifyContent: 'center' }}>
+          <AppText color={colors.primary} style={{ fontWeight: '800' }}>
+            {info.symbol}
+          </AppText>
+        </View>
+        <AppText style={{ flex: 1, fontWeight: '500' }}>
           {info.name} ({info.code})
         </AppText>
-        {!disabled ? <Icon name="chevron-down" size={18} color={colors.textMuted} /> : <Icon name="lock-outline" size={16} color={colors.textMuted} />}
+        {!disabled ? <Icon name="chevron-down" size={18} color={colors.textSubtle} /> : <Icon name="lock-outline" size={16} color={colors.textSubtle} />}
       </Pressable>
       {hint ? (
-        <AppText variant="caption" muted>
+        <AppText variant="caption" muted style={{ paddingHorizontal: spacing.xs }}>
           {hint}
         </AppText>
       ) : null}

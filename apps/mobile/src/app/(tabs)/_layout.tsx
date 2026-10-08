@@ -1,7 +1,7 @@
 import { Tabs } from 'expo-router';
 import type { ColorValue } from 'react-native';
+import { GlassTabBar } from '@/components/GlassTabBar';
 import { Icon } from '@/components/ui';
-import { useTheme } from '@/theme';
 
 const tab = (title: string, icon: string) => ({
   title,
@@ -9,20 +9,13 @@ const tab = (title: string, icon: string) => ({
 });
 
 export default function TabsLayout() {
-  const { colors } = useTheme();
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.textMuted,
-        tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border },
-      }}>
-      <Tabs.Screen name="index" options={tab('Home', 'home-variant-outline')} />
-      <Tabs.Screen name="transactions" options={tab('Activity', 'format-list-bulleted')} />
-      <Tabs.Screen name="rooms" options={tab('Rooms', 'account-group-outline')} />
+    <Tabs tabBar={(props) => <GlassTabBar {...props} />} screenOptions={{ headerShown: false }}>
+      <Tabs.Screen name="index" options={tab('Home', 'home-variant')} />
+      <Tabs.Screen name="transactions" options={tab('Activity', 'swap-vertical-bold')} />
+      <Tabs.Screen name="rooms" options={tab('Rooms', 'account-group')} />
       <Tabs.Screen name="insights" options={tab('Insights', 'chart-donut')} />
-      <Tabs.Screen name="profile" options={tab('Profile', 'account-circle-outline')} />
+      <Tabs.Screen name="profile" options={tab('Profile', 'account-circle')} />
     </Tabs>
   );
 }

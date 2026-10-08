@@ -1,49 +1,75 @@
 import { useColorScheme } from 'react-native';
 import { useThemeMode } from '@/lib/themeMode';
 
+const brand = {
+  orange: '#FF4F0F',
+  white: '#FFFFFF',
+  gray: '#AAAAAA',
+  mist: '#F5F5F7',
+  black: '#000000',
+} as const;
+
 const palette = {
-  primary: '#4F46E5',
-  primaryMuted: '#EEF2FF',
-  success: '#059669',
-  danger: '#DC2626',
-  warning: '#D97706',
-  info: '#2563EB',
+  primary: brand.orange,
+  primaryMuted: 'rgba(255,79,15,0.12)',
+  /** Gradient end for primary surfaces (buttons, hero cards). */
+  primaryDeep: '#E63E00',
+  primaryGlow: 'rgba(255,79,15,0.35)',
+  success: '#16A34A',
+  danger: '#E5383B',
+  warning: '#F59E0B',
+  info: brand.orange,
+  onPrimary: brand.white,
 };
 
 export const colors = {
   light: {
     ...palette,
-    background: '#F7F7FB',
-    surface: '#FFFFFF',
-    surfaceAlt: '#F1F2F6',
-    border: '#E4E5EB',
-    text: '#111827',
-    textMuted: '#6B7280',
-    onPrimary: '#FFFFFF',
+    background: brand.mist,
+    surface: brand.white,
+    surfaceAlt: 'rgba(0,0,0,0.04)',
+    border: 'rgba(0,0,0,0.06)',
+    text: brand.black,
+    textMuted: 'rgba(0,0,0,0.5)',
+    textSubtle: brand.gray,
     income: palette.success,
-    expense: '#111827',
+    expense: brand.black,
+    glass: 'rgba(255,255,255,0.62)',
+    glassStrong: 'rgba(255,255,255,0.86)',
+    glassBorder: 'rgba(255,255,255,0.9)',
+    glassHighlight: 'rgba(255,255,255,0.7)',
+    shadow: 'rgba(17,17,17,0.08)',
+    glow: 'rgba(255,79,15,0.22)',
+    glowSoft: 'rgba(255,79,15,0.10)',
+    scrim: 'rgba(0,0,0,0.35)',
   },
   dark: {
     ...palette,
-    primary: '#818CF8',
-    primaryMuted: '#1E1B4B',
-    info: '#60A5FA',
-    background: '#0B0B10',
-    surface: '#16161D',
-    surfaceAlt: '#1F1F28',
-    border: '#2A2A35',
-    text: '#F3F4F6',
-    textMuted: '#9CA3AF',
-    onPrimary: '#0B0B10',
+    primaryMuted: 'rgba(255,79,15,0.18)',
+    background: brand.black,
+    surface: '#111113',
+    surfaceAlt: 'rgba(255,255,255,0.07)',
+    border: 'rgba(255,255,255,0.09)',
+    text: brand.white,
+    textMuted: 'rgba(255,255,255,0.6)',
+    textSubtle: brand.gray,
     income: '#34D399',
-    expense: '#F3F4F6',
+    expense: brand.white,
+    glass: 'rgba(255,255,255,0.06)',
+    glassStrong: 'rgba(28,28,30,0.82)',
+    glassBorder: 'rgba(255,255,255,0.12)',
+    glassHighlight: 'rgba(255,255,255,0.10)',
+    shadow: 'rgba(0,0,0,0.5)',
+    glow: 'rgba(255,79,15,0.30)',
+    glowSoft: 'rgba(255,79,15,0.12)',
+    scrim: 'rgba(0,0,0,0.6)',
   },
 };
 
 export type ThemeColors = typeof colors.light;
 
 export const spacing = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 } as const;
-export const radius = { sm: 8, md: 12, lg: 16, pill: 999 } as const;
+export const radius = { sm: 10, md: 14, lg: 22, xl: 28, pill: 999 } as const;
 
 export const useTheme = () => {
   const scheme = useColorScheme();

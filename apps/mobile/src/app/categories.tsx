@@ -116,7 +116,13 @@ function NewCategorySheet({ type, onClose }: { type: TransactionType; onClose: (
             <Pressable
               key={i}
               onPress={() => setIcon(i)}
-              style={{ padding: spacing.sm, borderRadius: radius.md, borderWidth: 1.5, borderColor: i === icon ? color : colors.border }}>
+              style={{
+                padding: spacing.sm,
+                borderRadius: radius.md,
+                borderWidth: 1.5,
+                borderColor: i === icon ? color : colors.glassBorder,
+                backgroundColor: i === icon ? `${color}1A` : colors.glass,
+              }}>
               <Icon name={i} color={i === icon ? color : colors.textMuted} />
             </Pressable>
           ))}

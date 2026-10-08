@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withDelay, withSpring } from 'react-native-reanimated';
 import { formatMoney } from '@expense/shared';
 import { spacing, useTheme } from '@/theme';
 import { AppText } from './ui';
@@ -7,7 +8,7 @@ import { AppText } from './ui';
 type Period = 'week' | 'month' | 'year';
 type Bucket = { key: string; label: string; title: string; value: number };
 
-const CHART_HEIGHT = 120;
+const CHART_HEIGHT = 140;
 const pad = (n: number) => String(n).padStart(2, '0');
 const dayKey = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 
@@ -37,6 +38,28 @@ const buildBuckets = (period: Period, from: Date, to: Date, values: Map<string, 
   }
   return buckets;
 };
+
+function Bar({ height, index, color, empty, dimmed }: { height: number; index: number; color: string; empty: string; dimmed: boolean }) {
+  const h = useSharedValue(4);
+  useEffect(() => {
+    h.set(withDelay(index * 18, withSpring(height, { damping: 15, stiffness: 140 })));
+  }, [h, height, index]);
+  const style = useAnimatedStyle(() => ({ height: h.get() }));
+  const filled = height > 4;
+  return (
+    <Animated.View
+      style={[
+        {
+          borderRadius: 999,
+          backgroundColor: filled ? color : empty,
+          experimental_backgroundImage: filled ? `linear-gradient(180deg, ${color}, ${color}88)` : undefined,
+          opacity: dimmed ? 0.3 : 1,
+        },
+        style,
+      ]}
+    />
+  );
+}
 
 export function TrendChart({
   period,
@@ -69,14 +92,31 @@ export function TrendChart({
 
   return (
     <View style={{ gap: spacing.md }}>
-      <AppText variant="caption" muted>
-        {active
-          ? `${active.title} · ${formatMoney(active.value, currency)}`
-          : `Avg ${formatMoney(Math.round(average), currency)} / ${period === 'year' ? 'month' : 'day'}`}
-      </AppText>
+      <View style={{ alignSelf: 'flex-start', backgroundColor: colors.primaryMuted, borderRadius: 999, paddingHorizontal: spacing.md, paddingVertical: 5 }}>
+        <AppText variant="caption" color={colors.primary} style={{ fontWeight: '700' }}>
+          {active
+            ? `${active.title} · ${formatMoney(active.value, currency)}`
+            : `Avg ${formatMoney(Math.round(average), currency)} / ${period === 'year' ? 'month' : 'day'}`}
+        </AppText>
+      </View>
 
       <View style={{ height: CHART_HEIGHT, flexDirection: 'row', alignItems: 'flex-end', gap }}>
-        {buckets.map((b) => {
+        {average > 0 ? (
+          <View
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              bottom: (average / max) * CHART_HEIGHT,
+              borderTopWidth: 1,
+              borderStyle: 'dashed',
+              borderColor: colors.textSubtle,
+              opacity: 0.6,
+            }}
+          />
+        ) : null}
+        {buckets.map((b, i) => {
           const isActive = b.key === selected;
           return (
             <Pressable
@@ -84,13 +124,12 @@ export function TrendChart({
               accessibilityLabel={`${b.title}: ${formatMoney(b.value, currency)}`}
               onPress={() => setSelected(isActive ? null : b.key)}
               style={{ flex: 1, height: '100%', justifyContent: 'flex-end' }}>
-              <View
-                style={{
-                  height: b.value > 0 ? Math.max(4, (b.value / max) * CHART_HEIGHT) : 4,
-                  borderRadius: 999,
-                  backgroundColor: b.value > 0 ? color : colors.border,
-                  opacity: selected && !isActive ? 0.3 : 1,
-                }}
+              <Bar
+                index={i}
+                height={b.value > 0 ? Math.max(6, (b.value / max) * CHART_HEIGHT) : 4}
+                color={color}
+                empty={colors.surfaceAlt}
+                dimmed={!!selected && !isActive}
               />
             </Pressable>
           );

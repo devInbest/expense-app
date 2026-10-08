@@ -1,9 +1,9 @@
 import * as Localization from 'expo-localization';
 import { useState } from 'react';
-import { View } from 'react-native';
 import { CURRENCY_CODES, DEFAULT_CURRENCY, completeOnboardingSchema } from '@expense/shared';
+import { AuthHeader } from '@/components/AuthHeader';
 import { CurrencyField } from '@/components/CurrencyField';
-import { AppText, Button, Field, Screen } from '@/components/ui';
+import { Appear, Button, Field, Glass, Screen } from '@/components/ui';
 import { api, errorMessage } from '@/lib/api';
 import { useAuth, useUser } from '@/lib/auth';
 import { registerForPush } from '@/lib/push';
@@ -46,20 +46,23 @@ export default function Onboarding() {
   };
 
   return (
-    <Screen edges={['top', 'bottom']}>
-      <View style={{ gap: spacing.xs, marginTop: spacing.xl }}>
-        <AppText variant="title">Welcome!</AppText>
-        <AppText muted>A couple of details to set things up. You can change these later.</AppText>
-      </View>
-      <Field label="Your name" value={name} onChangeText={setName} placeholder="e.g. Priya Sharma" autoFocus={!user.name} error={error} />
-      <CurrencyField
-        label="Default currency"
-        value={currency}
-        onChange={setCurrency}
-        hint="Used for your personal expenses. Each room picks its own currency."
-      />
-      <Button title="Get started" onPress={submit} loading={loading} />
-      <Button title="Use a different account" variant="ghost" onPress={() => void signOut()} />
+    <Screen edges={['top', 'bottom']} contentStyle={{ gap: spacing.xl, paddingTop: spacing.xxl }}>
+      <AuthHeader icon="hand-wave-outline" title="Welcome!" subtitle="A couple of details to set things up. You can change these later." />
+      <Appear index={1}>
+        <Glass style={{ padding: spacing.lg, gap: spacing.lg }}>
+          <Field label="Your name" value={name} onChangeText={setName} placeholder="e.g. Priya Sharma" autoFocus={!user.name} error={error} />
+          <CurrencyField
+            label="Default currency"
+            value={currency}
+            onChange={setCurrency}
+            hint="Used for your personal expenses. Each room picks its own currency."
+          />
+        </Glass>
+      </Appear>
+      <Appear index={2} style={{ gap: spacing.sm }}>
+        <Button title="Get started" icon="rocket-launch-outline" onPress={submit} loading={loading} />
+        <Button title="Use a different account" variant="ghost" onPress={() => void signOut()} />
+      </Appear>
     </Screen>
   );
 }

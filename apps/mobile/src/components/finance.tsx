@@ -7,7 +7,7 @@ import { UNKNOWN_CATEGORY } from '@/hooks/data';
 import { formatDate, formatTime } from '@/lib/dates';
 import type { LocalTransaction } from '@/lib/transactions';
 import { radius, spacing, useTheme } from '@/theme';
-import { AppText, Button, CategoryIcon, Field, Icon, IconButton, Row } from './ui';
+import { AppText, Backdrop, Button, CategoryIcon, Field, Icon, Row, SheetHeader, useFieldBoxStyle } from './ui';
 
 export function Money({
   amount,
@@ -22,7 +22,7 @@ export function Money({
   currency: string;
   type?: TransactionType;
   signed?: boolean;
-  variant?: 'title' | 'heading' | 'subheading' | 'body' | 'caption';
+  variant?: 'display' | 'title' | 'heading' | 'subheading' | 'body' | 'caption';
   compact?: boolean;
   color?: string;
 }) {
@@ -51,17 +51,19 @@ export function AmountInput({ value, onChange, currency, autoFocus }: { value: s
   };
   return (
     <Row style={{ justifyContent: 'center', paddingVertical: spacing.lg }}>
-      <AppText style={{ fontSize: 36, fontWeight: '600' }} muted>
+      <AppText style={{ fontSize: 36, fontWeight: '700' }} color={colors.primary}>
         {info.symbol}
       </AppText>
       <TextInput
         value={value}
         onChangeText={(t) => onChange(sanitize(t))}
         placeholder="0"
-        placeholderTextColor={colors.textMuted}
+        placeholderTextColor={colors.textSubtle}
+        selectionColor={colors.primary}
+        cursorColor={colors.primary}
         keyboardType="decimal-pad"
         autoFocus={autoFocus}
-        style={{ fontSize: 44, fontWeight: '700', color: colors.text, minWidth: 80, textAlign: 'center' }}
+        style={{ fontSize: 52, fontWeight: '800', letterSpacing: -1, color: colors.text, minWidth: 80, textAlign: 'center' }}
       />
     </Row>
   );
@@ -89,11 +91,13 @@ export function CategoryGrid({
               width: '23%',
               alignItems: 'center',
               gap: 4,
-              paddingVertical: spacing.sm,
+              paddingVertical: spacing.sm + 2,
               borderRadius: radius.md,
               borderWidth: 1.5,
-              borderColor: selected ? c.color : 'transparent',
-              backgroundColor: selected ? `${c.color}14` : colors.surface,
+              borderColor: selected ? c.color : colors.glassBorder,
+              backgroundColor: selected ? `${c.color}1A` : colors.glass,
+              boxShadow: selected ? `0 6px 16px ${c.color}33` : undefined,
+              transform: [{ scale: selected ? 1.04 : 1 }],
             }}>
             <CategoryIcon icon={c.icon} color={c.color} size={36} />
             <AppText variant="caption" numberOfLines={1} style={{ maxWidth: '90%' }}>
@@ -108,26 +112,16 @@ export function CategoryGrid({
 
 export function DateField({ label, value, onChange, maximumDate }: { label: string; value: Date; onChange: (d: Date) => void; maximumDate?: Date }) {
   const { colors, dark } = useTheme();
+  const box = useFieldBoxStyle();
   const [open, setOpen] = useState(false);
   return (
     <View style={{ gap: spacing.xs }}>
-      <AppText variant="caption" muted>
+      <AppText variant="caption" muted style={{ fontWeight: '600', paddingHorizontal: spacing.xs }}>
         {label}
       </AppText>
-      <Pressable
-        onPress={() => setOpen(true)}
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: spacing.sm,
-          backgroundColor: colors.surface,
-          borderColor: colors.border,
-          borderWidth: 1,
-          borderRadius: radius.md,
-          padding: spacing.md,
-        }}>
-        <Icon name="calendar" size={18} color={colors.textMuted} />
-        <AppText>
+      <Pressable onPress={() => setOpen(true)} style={({ pressed }) => [box, { opacity: pressed ? 0.75 : 1 }]}>
+        <Icon name="calendar-month-outline" size={18} color={colors.primary} />
+        <AppText style={{ fontWeight: '500' }}>
           {formatDate(value)} · {formatTime(value)}
         </AppText>
       </Pressable>
@@ -148,8 +142,18 @@ export function DateField({ label, value, onChange, maximumDate }: { label: stri
       ) : null}
       {Platform.OS === 'ios' ? (
         <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
-          <Pressable style={{ flex: 1, backgroundColor: '#0006', justifyContent: 'flex-end' }} onPress={() => setOpen(false)}>
-            <Pressable style={{ backgroundColor: colors.surface, padding: spacing.lg, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg }}>
+          <Pressable style={{ flex: 1, backgroundColor: colors.scrim, justifyContent: 'flex-end' }} onPress={() => setOpen(false)}>
+            <Pressable
+              style={{
+                backgroundColor: colors.glassStrong,
+                padding: spacing.lg,
+                paddingBottom: spacing.xxl,
+                gap: spacing.md,
+                borderTopLeftRadius: radius.xl,
+                borderTopRightRadius: radius.xl,
+                borderWidth: 1,
+                borderColor: colors.glassBorder,
+              }}>
               <DateTimePicker
                 value={value}
                 mode="datetime"
@@ -200,44 +204,56 @@ export function SelectModal({
     : options;
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
-        <Row style={{ padding: spacing.lg }}>
-          <AppText variant="heading" style={{ flex: 1 }}>
-            {title}
-          </AppText>
-          <IconButton icon="close" label="Close" onPress={onClose} />
-        </Row>
-        {searchable ? (
-          <View style={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.sm }}>
-            <Field placeholder="Search" value={q} onChangeText={setQ} autoCorrect={false} />
-          </View>
-        ) : null}
-        <FlatList
-          data={filtered}
-          keyExtractor={(o) => o.value}
-          keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{ paddingHorizontal: spacing.lg }}
-          renderItem={({ item }) => (
-            <Pressable
-              onPress={() => {
-                onSelect(item.value);
-                onClose();
-              }}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.md }}>
-              {item.left}
-              <View style={{ flex: 1 }}>
-                <AppText>{item.label}</AppText>
-                {item.description ? (
-                  <AppText variant="caption" muted>
-                    {item.description}
-                  </AppText>
-                ) : null}
-              </View>
-              {item.value === value ? <Icon name="check" color={colors.primary} /> : null}
-            </Pressable>
-          )}
-        />
-      </SafeAreaView>
+      <View style={{ flex: 1 }}>
+        <Backdrop />
+        <SafeAreaView style={{ flex: 1 }}>
+          <SheetHeader title={title} onClose={onClose} />
+          {searchable ? (
+            <View style={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.md }}>
+              <Field placeholder="Search" value={q} onChangeText={setQ} autoCorrect={false} />
+            </View>
+          ) : null}
+          <FlatList
+            data={filtered}
+            keyExtractor={(o) => o.value}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.xs }}
+            renderItem={({ item }) => {
+              const selected = item.value === value;
+              return (
+                <Pressable
+                  onPress={() => {
+                    onSelect(item.value);
+                    onClose();
+                  }}
+                  style={({ pressed }) => ({
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: spacing.md,
+                    paddingVertical: spacing.md,
+                    paddingHorizontal: spacing.md,
+                    borderRadius: radius.md,
+                    backgroundColor: selected ? colors.primaryMuted : pressed ? colors.surfaceAlt : 'transparent',
+                  })}>
+                  {item.left}
+                  <View style={{ flex: 1 }}>
+                    <AppText style={{ fontWeight: selected ? '700' : '500' }} color={selected ? colors.primary : undefined}>
+                      {item.label}
+                    </AppText>
+                    {item.description ? (
+                      <AppText variant="caption" muted>
+                        {item.description}
+                      </AppText>
+                    ) : null}
+                  </View>
+                  {selected ? <Icon name="check-circle" color={colors.primary} /> : null}
+                </Pressable>
+              );
+            }}
+          />
+        </SafeAreaView>
+      </View>
     </Modal>
   );
 }
@@ -256,10 +272,12 @@ export function TransactionRow({
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm, opacity: pressed ? 0.6 : 1 })}>
-      <CategoryIcon icon={cat.icon} color={cat.color} />
+      style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm + 2, opacity: pressed ? 0.6 : 1 })}>
+      <CategoryIcon icon={cat.icon} color={cat.color} size={44} square />
       <View style={{ flex: 1 }}>
-        <AppText numberOfLines={1}>{cat.name}</AppText>
+        <AppText numberOfLines={1} style={{ fontWeight: '600' }}>
+          {cat.name}
+        </AppText>
         <Row gap={4}>
           <AppText variant="caption" muted numberOfLines={1}>
             {formatTime(tx.occurredAt)}
@@ -292,10 +310,12 @@ export function RoomExpenseRow({
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm, opacity: pressed ? 0.6 : 1 })}>
-      <CategoryIcon icon={cat.icon} color={cat.color} />
+      style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm + 2, opacity: pressed ? 0.6 : 1 })}>
+      <CategoryIcon icon={cat.icon} color={cat.color} size={44} square />
       <View style={{ flex: 1 }}>
-        <AppText numberOfLines={1}>{cat.name}</AppText>
+        <AppText numberOfLines={1} style={{ fontWeight: '600' }}>
+          {cat.name}
+        </AppText>
         <AppText variant="caption" muted numberOfLines={1}>
           {formatTime(item.occurredAt)}
         </AppText>

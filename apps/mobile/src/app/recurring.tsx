@@ -1,12 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Alert, Switch, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { qk } from '@expense/api-client';
 import { RECURRING_FREQUENCY_VALUES, formatMoney, toMinor, type RecurringFrequency, type RecurringRuleDTO } from '@expense/shared';
 import { AmountInput, CategoryGrid, DateField } from '@/components/finance';
 import {
   AppText,
+  BottomBar,
   Button,
   Card,
   CategoryIcon,
@@ -51,7 +51,7 @@ export default function Recurring() {
   if (rules.error) return <ErrorState message={errorMessage(rules.error)} onRetry={() => void rules.refetch()} />;
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
+    <View style={{ flex: 1 }}>
       <Screen edges={[]} contentStyle={{ flexGrow: 1, paddingBottom: spacing.lg }}>
         {rules.data?.length ? (
           rules.data.map((r) => {
@@ -88,9 +88,9 @@ export default function Recurring() {
           </View>
         )}
       </Screen>
-      <SafeAreaView edges={['bottom']} style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.sm }}>
+      <BottomBar>
         <Button title="Add recurring" icon="plus" onPress={() => setCreating(true)} />
-      </SafeAreaView>
+      </BottomBar>
       {creating ? <NewRuleSheet onClose={() => setCreating(false)} /> : null}
     </View>
   );

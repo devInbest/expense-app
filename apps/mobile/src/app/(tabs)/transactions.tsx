@@ -1,13 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Animated, Pressable, RefreshControl, SectionList, View } from 'react-native';
+import { Pressable, RefreshControl, SectionList, View } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { qk } from '@expense/api-client';
 import type { RoomSpendingItemDTO, TransactionType } from '@expense/shared';
 import { Money, RoomExpenseRow, TransactionRow } from '@/components/finance';
 import { SyncBanner } from '@/components/SyncBanner';
-import { AppText, Card, Chip, EmptyState, Fab, Icon, IconButton, Row } from '@/components/ui';
+import { AppText, Appear, Backdrop, Chip, EmptyState, Fab, Glass, Icon, IconButton, linearGradient, Row, SPRING, useTabBarInset } from '@/components/ui';
 import { useCategories, useLocalQuery, useSpendingSummary } from '@/hooks/data';
 import { api } from '@/lib/api';
 import { useUser } from '@/lib/auth';
@@ -18,30 +19,30 @@ import { radius, spacing, useTheme } from '@/theme';
 
 const PAGE = 100;
 
-/** Seasonal color and icon per month, January first. */
-const MONTH_THEME: { color: string; icon: string }[] = [
-  { color: '#4FA3E0', icon: 'snowflake' },
-  { color: '#E85D9A', icon: 'heart-outline' },
-  { color: '#5DBB63', icon: 'flower-outline' },
-  { color: '#F2B33D', icon: 'weather-sunny' },
-  { color: '#F28C38', icon: 'white-balance-sunny' },
-  { color: '#E85A4F', icon: 'fire' },
-  { color: '#2BA59B', icon: 'weather-pouring' },
-  { color: '#3F7FD9', icon: 'umbrella-outline' },
-  { color: '#8E6BD6', icon: 'leaf' },
-  { color: '#D9822B', icon: 'leaf-maple' },
-  { color: '#A0653A', icon: 'weather-windy' },
-  { color: '#C93B4A', icon: 'gift-outline' },
+/** Seasonal icon per month, January first. */
+const MONTH_ICON = [
+  'snowflake',
+  'heart-outline',
+  'flower-outline',
+  'weather-sunny',
+  'white-balance-sunny',
+  'fire',
+  'weather-pouring',
+  'umbrella-outline',
+  'leaf',
+  'leaf-maple',
+  'weather-windy',
+  'gift-outline',
 ];
 
 function CollapseChevron({ collapsed, color }: { collapsed: boolean; color: string }) {
-  const [progress] = useState(() => new Animated.Value(collapsed ? 1 : 0));
+  const progress = useSharedValue(collapsed ? 1 : 0);
   useEffect(() => {
-    Animated.timing(progress, { toValue: collapsed ? 1 : 0, duration: 200, useNativeDriver: true }).start();
+    progress.set(withSpring(collapsed ? 1 : 0, SPRING));
   }, [collapsed, progress]);
-  const rotate = progress.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '180deg'] });
+  const style = useAnimatedStyle(() => ({ transform: [{ rotate: `${progress.get() * 180}deg` }] }));
   return (
-    <Animated.View style={{ transform: [{ rotate }] }}>
+    <Animated.View style={style}>
       <Icon name="chevron-up" size={20} color={color} />
     </Animated.View>
   );
@@ -49,24 +50,44 @@ function CollapseChevron({ collapsed, color }: { collapsed: boolean; color: stri
 
 function MonthCard({ from, to, count }: { from: Date; to: Date; count: number }) {
   const { colors } = useTheme();
-  const { color, icon } = MONTH_THEME[from.getMonth()]!;
   const totalDays = Math.round((to.getTime() - from.getTime()) / 86_400_000);
   const day = new Date().getDate();
   const left = totalDays - day;
   return (
-    <View style={{ backgroundColor: `${color}26`, borderRadius: radius.lg, padding: spacing.md }}>
+    <View
+      style={{
+        borderRadius: radius.lg,
+        padding: spacing.md + 2,
+        overflow: 'hidden',
+        backgroundColor: colors.primary,
+        experimental_backgroundImage: linearGradient('#FF7A45', colors.primaryDeep),
+        boxShadow: `0 12px 30px ${colors.primaryGlow}`,
+      }}>
+      <View style={{ position: 'absolute', width: 160, height: 160, borderRadius: 80, backgroundColor: 'rgba(255,255,255,0.14)', top: -80, right: -40 }} />
       <Row gap={spacing.md}>
-        <View style={{ width: 44, height: 44, borderRadius: radius.md, backgroundColor: color, alignItems: 'center', justifyContent: 'center' }}>
-          <Icon name={icon} size={24} color="#FFFFFF" />
+        <View
+          style={{
+            width: 48,
+            height: 48,
+            borderRadius: radius.md,
+            backgroundColor: 'rgba(255,255,255,0.2)',
+            borderWidth: 1,
+            borderColor: 'rgba(255,255,255,0.35)',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+          <Icon name={MONTH_ICON[from.getMonth()]!} size={24} color={colors.onPrimary} />
         </View>
         <View style={{ flex: 1 }}>
-          <AppText variant="heading">{formatMonth(from)}</AppText>
-          <AppText variant="caption" muted numberOfLines={1}>
+          <AppText variant="heading" color={colors.onPrimary}>
+            {formatMonth(from)}
+          </AppText>
+          <AppText variant="caption" color={colors.onPrimary} numberOfLines={1} style={{ opacity: 0.85 }}>
             {count} {count === 1 ? 'Transaction' : 'Transactions'}
           </AppText>
         </View>
-        <View style={{ backgroundColor: colors.surface, borderRadius: radius.pill, paddingHorizontal: spacing.sm, paddingVertical: 4 }}>
-          <AppText variant="caption" color={color} style={{ fontWeight: '700' }}>
+        <View style={{ backgroundColor: 'rgba(255,255,255,0.95)', borderRadius: radius.pill, paddingHorizontal: spacing.md, paddingVertical: 5 }}>
+          <AppText variant="caption" color={colors.primaryDeep} style={{ fontWeight: '800' }}>
             {left === 0 ? 'Last day' : `${left} ${left === 1 ? 'day' : 'days'} left`}
           </AppText>
         </View>
@@ -75,11 +96,28 @@ function MonthCard({ from, to, count }: { from: Date; to: Date; count: number })
   );
 }
 
+function StatTile({ label, icon, tone, children }: { label: string; icon: string; tone: string; children: React.ReactNode }) {
+  return (
+    <Glass style={{ flex: 1, padding: spacing.md, gap: spacing.sm }}>
+      <Row gap={spacing.sm}>
+        <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: `${tone}1F`, alignItems: 'center', justifyContent: 'center' }}>
+          <Icon name={icon} size={16} color={tone} />
+        </View>
+        <AppText variant="caption" muted style={{ fontWeight: '600' }}>
+          {label}
+        </AppText>
+      </Row>
+      {children}
+    </Glass>
+  );
+}
+
 type FeedItem = { kind: 'tx'; key: string; at: string; tx: LocalTransaction } | { kind: 'room'; key: string; at: string; room: RoomSpendingItemDTO };
 
 export default function Transactions() {
   const user = useUser();
-  const { colors, dark } = useTheme();
+  const { colors } = useTheme();
+  const tabInset = useTabBarInset();
   const { byId } = useCategories();
   const [type, setType] = useState<TransactionType | undefined>();
   const [limit, setLimit] = useState(PAGE);
@@ -135,92 +173,116 @@ export default function Transactions() {
   };
 
   return (
-    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.background }}>
-      <View style={{ padding: spacing.lg, gap: spacing.md }}>
-        <MonthCard from={month.from} to={month.to} count={summary?.count ?? 0} />
-        <Row gap={spacing.md}>
-          <Card style={{ flex: 1, alignItems: 'center', gap: spacing.xs }}>
-            <AppText variant="caption" muted>
-              Income
-            </AppText>
-            <Money amount={summary?.income ?? 0} currency={user.defaultCurrency} color={colors.income} />
-          </Card>
-          <Card style={{ flex: 1, alignItems: 'center', gap: spacing.xs }}>
-            <AppText variant="caption" muted>
-              Spent
-            </AppText>
-            <Money amount={summary?.expense ?? 0} currency={user.defaultCurrency} type="expense" />
-          </Card>
-        </Row>
-        <Row>
-          <Chip label="All" selected={!type} onPress={() => setType(undefined)} />
-          <Chip label="Expenses" selected={type === 'expense'} onPress={() => setType('expense')} />
-          <Chip label="Income" selected={type === 'income'} onPress={() => setType('income')} />
-          <View style={{ flex: 1 }} />
-          <IconButton icon="trash-can-outline" label="Bin" color={colors.danger} onPress={() => router.push('/bin')} />
-        </Row>
-        <SyncBanner />
-      </View>
-      <SectionList
-        sections={sections}
-        keyExtractor={(i) => i.key}
-        contentContainerStyle={{ flexGrow: 1, paddingHorizontal: spacing.lg, paddingBottom: 88 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        stickySectionHeadersEnabled={false}
-        onEndReached={() => {
-          if ((items?.length ?? 0) >= limit) setLimit((l) => l + PAGE);
-        }}
-        renderSectionHeader={({ section }) => {
-          const isCollapsed = collapsed.has(section.key);
-          return (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ expanded: !isCollapsed }}
-              accessibilityLabel={`${section.title}, ${isCollapsed ? 'expand' : 'collapse'}`}
-              onPress={() => toggleDay(section.key)}
-              style={({ pressed }) => ({
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: spacing.sm,
-                marginTop: spacing.xs,
-                marginBottom: spacing.xs,
-                paddingHorizontal: spacing.md,
-                paddingVertical: spacing.sm,
-                borderRadius: 4,
-                backgroundColor: dark ? '#262626' : '#EDEDED',
-                opacity: pressed ? 0.7 : 1,
-              })}>
-              <AppText variant="label" style={{ flex: 1, fontWeight: '700' }}>
-                {section.title}
-              </AppText>
-              {section.total > 0 ? <Money amount={section.total} currency={user.defaultCurrency} variant="subheading" type="expense" /> : null}
-              <CollapseChevron collapsed={isCollapsed} color={colors.textMuted} />
-            </Pressable>
-          );
-        }}
-        renderItem={({ item }) =>
-          item.kind === 'room' ? (
-            <RoomExpenseRow
-              item={item.room}
-              currency={user.defaultCurrency}
-              category={item.room.categoryId ? byId.get(item.room.categoryId) : undefined}
-              onPress={() => router.push({ pathname: '/room/[id]/expense-detail', params: { id: item.room.roomId, expenseId: item.room.expenseId } })}
-            />
-          ) : (
-            <TransactionRow
-              tx={item.tx}
-              category={byId.get(item.tx.categoryId)}
-              onPress={() => router.push({ pathname: '/transaction/view/[id]', params: { id: item.tx.clientId } })}
-            />
-          )
-        }
-        ListEmptyComponent={
-          <View style={{ flex: 1, justifyContent: 'center' }}>
-            <EmptyState icon="text-box-search-outline" title={type ? 'No matches' : 'Nothing this month'} />
-          </View>
-        }
-      />
-      <Fab label="Add transaction" onPress={() => router.push({ pathname: '/transaction/[id]', params: { id: 'new' } })} />
-    </SafeAreaView>
+    <View style={{ flex: 1 }}>
+      <Backdrop />
+      <SafeAreaView edges={['top']} style={{ flex: 1 }}>
+        <View style={{ padding: spacing.lg, gap: spacing.md }}>
+          <Appear>
+            <MonthCard from={month.from} to={month.to} count={summary?.count ?? 0} />
+          </Appear>
+          <Appear index={1}>
+            <Row gap={spacing.md}>
+              <StatTile label="Income" icon="arrow-bottom-left" tone={colors.income}>
+                <Money amount={summary?.income ?? 0} currency={user.defaultCurrency} color={colors.income} />
+              </StatTile>
+              <StatTile label="Spent" icon="arrow-top-right" tone={colors.primary}>
+                <Money amount={summary?.expense ?? 0} currency={user.defaultCurrency} type="expense" />
+              </StatTile>
+            </Row>
+          </Appear>
+          <Appear index={2}>
+            <Row>
+              <Chip label="All" selected={!type} onPress={() => setType(undefined)} />
+              <Chip label="Expenses" selected={type === 'expense'} onPress={() => setType('expense')} />
+              <Chip label="Income" selected={type === 'income'} onPress={() => setType('income')} />
+              <View style={{ flex: 1 }} />
+              <IconButton glass icon="trash-can-outline" label="Bin" color={colors.danger} onPress={() => router.push('/bin')} />
+            </Row>
+          </Appear>
+          <SyncBanner />
+        </View>
+        <SectionList
+          sections={sections}
+          keyExtractor={(i) => i.key}
+          contentContainerStyle={{ flexGrow: 1, paddingHorizontal: spacing.lg, paddingBottom: tabInset + 80 }}
+          showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />}
+          stickySectionHeadersEnabled={false}
+          onEndReached={() => {
+            if ((items?.length ?? 0) >= limit) setLimit((l) => l + PAGE);
+          }}
+          renderSectionHeader={({ section }) => {
+            const isCollapsed = collapsed.has(section.key);
+            return (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ expanded: !isCollapsed }}
+                accessibilityLabel={`${section.title}, ${isCollapsed ? 'expand' : 'collapse'}`}
+                onPress={() => toggleDay(section.key)}
+                style={({ pressed }) => ({
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: spacing.sm,
+                  marginTop: spacing.md,
+                  paddingHorizontal: spacing.md,
+                  paddingVertical: spacing.sm + 2,
+                  borderTopLeftRadius: radius.lg,
+                  borderTopRightRadius: radius.lg,
+                  borderBottomLeftRadius: isCollapsed ? radius.lg : 0,
+                  borderBottomRightRadius: isCollapsed ? radius.lg : 0,
+                  backgroundColor: colors.glassStrong,
+                  borderWidth: 1,
+                  borderColor: colors.glassBorder,
+                  opacity: pressed ? 0.7 : 1,
+                })}>
+                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.primary }} />
+                <AppText variant="label" style={{ flex: 1 }}>
+                  {section.title}
+                </AppText>
+                {section.total > 0 ? <Money amount={section.total} currency={user.defaultCurrency} variant="body" type="expense" /> : null}
+                <CollapseChevron collapsed={isCollapsed} color={colors.textMuted} />
+              </Pressable>
+            );
+          }}
+          renderItem={({ item, index, section }) => {
+            const last = index === section.data.length - 1;
+            return (
+              <View
+                style={{
+                  paddingHorizontal: spacing.md,
+                  backgroundColor: colors.glass,
+                  borderLeftWidth: 1,
+                  borderRightWidth: 1,
+                  borderBottomWidth: last ? 1 : 0,
+                  borderColor: colors.glassBorder,
+                  borderBottomLeftRadius: last ? radius.lg : 0,
+                  borderBottomRightRadius: last ? radius.lg : 0,
+                }}>
+                {item.kind === 'room' ? (
+                  <RoomExpenseRow
+                    item={item.room}
+                    currency={user.defaultCurrency}
+                    category={item.room.categoryId ? byId.get(item.room.categoryId) : undefined}
+                    onPress={() => router.push({ pathname: '/room/[id]/expense-detail', params: { id: item.room.roomId, expenseId: item.room.expenseId } })}
+                  />
+                ) : (
+                  <TransactionRow
+                    tx={item.tx}
+                    category={byId.get(item.tx.categoryId)}
+                    onPress={() => router.push({ pathname: '/transaction/view/[id]', params: { id: item.tx.clientId } })}
+                  />
+                )}
+              </View>
+            );
+          }}
+          ListEmptyComponent={
+            <View style={{ flex: 1, justifyContent: 'center' }}>
+              <EmptyState icon="text-box-search-outline" title={type ? 'No matches' : 'Nothing this month'} />
+            </View>
+          }
+        />
+        <Fab label="Add transaction" onPress={() => router.push({ pathname: '/transaction/[id]', params: { id: 'new' } })} />
+      </SafeAreaView>
+    </View>
   );
 }

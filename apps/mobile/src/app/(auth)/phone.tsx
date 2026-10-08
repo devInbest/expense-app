@@ -2,7 +2,8 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { View } from 'react-native';
 import { phoneSchema } from '@expense/shared';
-import { AppText, Button, Field, Row, Screen } from '@/components/ui';
+import { AuthHeader } from '@/components/AuthHeader';
+import { Appear, Button, Field, Glass, Row, Screen } from '@/components/ui';
 import { api, errorMessage } from '@/lib/api';
 import { spacing } from '@/theme';
 
@@ -34,30 +35,31 @@ export default function PhoneScreen() {
   };
 
   return (
-    <Screen edges={['bottom']}>
-      <View style={{ gap: spacing.xs }}>
-        <AppText variant="title">Your phone number</AppText>
-        <AppText muted>We’ll text you a 6-digit code to sign in. Standard SMS rates may apply.</AppText>
-      </View>
-      <Row style={{ alignItems: 'flex-start' }}>
-        <View style={{ width: 84 }}>
-          <Field value={countryCode} onChangeText={(t) => setCountryCode(`+${t.replace(/\D/g, '').slice(0, 4)}`)} keyboardType="phone-pad" />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Field
-            value={number}
-            onChangeText={setNumber}
-            placeholder="98765 43210"
-            keyboardType="phone-pad"
-            autoFocus
-            textContentType="telephoneNumber"
-            autoComplete="tel"
-            error={error}
-            onSubmitEditing={submit}
-          />
-        </View>
-      </Row>
-      <Button title="Send code" onPress={submit} loading={loading} disabled={number.replace(/\D/g, '').length < 6} />
+    <Screen edges={['bottom']} contentStyle={{ gap: spacing.xl }}>
+      <AuthHeader icon="cellphone-message" title="Your phone number" subtitle="We’ll text you a 6-digit code to sign in. Standard SMS rates may apply." />
+      <Appear index={1}>
+        <Glass style={{ padding: spacing.lg, gap: spacing.lg }}>
+          <Row style={{ alignItems: 'flex-start' }}>
+            <View style={{ width: 88 }}>
+              <Field value={countryCode} onChangeText={(t) => setCountryCode(`+${t.replace(/\D/g, '').slice(0, 4)}`)} keyboardType="phone-pad" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Field
+                value={number}
+                onChangeText={setNumber}
+                placeholder="98765 43210"
+                keyboardType="phone-pad"
+                autoFocus
+                textContentType="telephoneNumber"
+                autoComplete="tel"
+                error={error}
+                onSubmitEditing={submit}
+              />
+            </View>
+          </Row>
+          <Button title="Send code" icon="arrow-right" onPress={submit} loading={loading} disabled={number.replace(/\D/g, '').length < 6} />
+        </Glass>
+      </Appear>
     </Screen>
   );
 }

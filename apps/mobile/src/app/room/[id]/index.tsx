@@ -8,7 +8,9 @@ import { formatMoney, type RoomExpenseDTO } from '@expense/shared';
 import { Money } from '@/components/finance';
 import {
   AppText,
+  Appear,
   Avatar,
+  Backdrop,
   Banner,
   Button,
   Card,
@@ -18,6 +20,7 @@ import {
   Fab,
   Icon,
   IconButton,
+  linearGradient,
   Loading,
   ProgressBar,
   Row,
@@ -26,7 +29,7 @@ import {
 import { useCategories } from '@/hooks/data';
 import { useRoom } from '@/hooks/rooms';
 import { api, errorMessage } from '@/lib/api';
-import { spacing, useTheme } from '@/theme';
+import { radius, spacing, useTheme } from '@/theme';
 
 type Tab = 'expenses' | 'balances';
 
@@ -72,54 +75,84 @@ export default function RoomScreen() {
         position: 'absolute',
         top: spacing.md,
         right: spacing.md,
-        width: 34,
-        height: 34,
-        borderRadius: 17,
+        width: 38,
+        height: 38,
+        borderRadius: 19,
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: colors.primaryMuted,
+        backgroundColor: 'rgba(255,255,255,0.22)',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.4)',
         opacity: pressed ? 0.6 : 1,
       })}>
-      <Icon name="account-plus-outline" size={18} color={colors.primary} />
+      <Icon name="account-plus-outline" size={18} color={colors.onPrimary} />
     </Pressable>
   ) : null;
 
-  const listBottom = (r.canAddExpense ? 88 : spacing.lg) + insets.bottom;
+  const listBottom = (r.canAddExpense ? 96 : spacing.lg) + insets.bottom;
+  const hero = {
+    borderRadius: radius.xl,
+    padding: spacing.lg + 2,
+    gap: spacing.xs,
+    overflow: 'hidden' as const,
+    backgroundColor: colors.primary,
+    experimental_backgroundImage: linearGradient('#FF7A45', colors.primaryDeep),
+    boxShadow: `0 16px 36px ${colors.primaryGlow}`,
+  };
+  const heroOrb = <View style={{ position: 'absolute', width: 200, height: 200, borderRadius: 100, backgroundColor: 'rgba(255,255,255,0.14)', top: -90, right: -60 }} />;
 
   const header = (
     <View style={{ gap: spacing.lg, paddingBottom: spacing.md }}>
       {r.archived ? <Banner tone="warning" icon="archive-outline" text="This room is archived. It's read-only until a manager restores it." /> : null}
       {isSplit ? (
-        <Card>
-          <AppText muted>Total spent</AppText>
-          <AppText variant="title">{formatMoney(balances.data?.totalSpent ?? 0, room.currency)}</AppText>
-          <AppText variant="caption" muted>
-            Your spending {formatMoney(balances.data?.spentBy[r.me] ?? 0, room.currency)}
+        <Appear style={hero}>
+          {heroOrb}
+          <AppText color={colors.onPrimary} style={{ opacity: 0.85, fontWeight: '600' }}>
+            Total spent
           </AppText>
+          <AppText variant="display" color={colors.onPrimary} numberOfLines={1} adjustsFontSizeToFit>
+            {formatMoney(balances.data?.totalSpent ?? 0, room.currency)}
+          </AppText>
+          <View style={{ alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: radius.pill, paddingHorizontal: spacing.md, paddingVertical: 5, marginTop: spacing.xs }}>
+            <AppText variant="caption" color={colors.onPrimary} style={{ fontWeight: '700' }}>
+              Your spending {formatMoney(balances.data?.spentBy[r.me] ?? 0, room.currency)}
+            </AppText>
+          </View>
           {inviteButton}
-        </Card>
+        </Appear>
       ) : (
-        <Card>
-          <AppText muted>Spent this period</AppText>
-          <AppText variant="title">{formatMoney(budget.data?.budget?.spent ?? budget.data?.totalSpent ?? 0, room.currency)}</AppText>
+        <Appear style={hero}>
+          {heroOrb}
+          <AppText color={colors.onPrimary} style={{ opacity: 0.85, fontWeight: '600' }}>
+            Spent this period
+          </AppText>
+          <AppText variant="display" color={colors.onPrimary} numberOfLines={1} adjustsFontSizeToFit>
+            {formatMoney(budget.data?.budget?.spent ?? budget.data?.totalSpent ?? 0, room.currency)}
+          </AppText>
           {budget.data?.budget ? (
-            <>
-              <ProgressBar percent={budget.data.budget.percent} />
-              <AppText variant="caption" muted>
+            <View style={{ gap: spacing.sm, marginTop: spacing.xs }}>
+              <ProgressBar percent={budget.data.budget.percent} color={colors.onPrimary} />
+              <AppText variant="caption" color={colors.onPrimary} style={{ fontWeight: '600', opacity: 0.9 }}>
                 {budget.data.budget.remaining >= 0
                   ? `${formatMoney(budget.data.budget.remaining, room.currency)} left of ${formatMoney(budget.data.budget.amount, room.currency)}`
                   : `${formatMoney(-budget.data.budget.remaining, room.currency)} over budget`}
               </AppText>
-            </>
+            </View>
           ) : r.isManager ? (
-            <Button title="Set a budget" compact variant="secondary" onPress={() => router.push({ pathname: '/room/[id]/settings', params: { id } })} />
+            <Button
+              title="Set a budget"
+              compact
+              variant="glass"
+              style={{ alignSelf: 'flex-start', marginTop: spacing.xs }}
+              onPress={() => router.push({ pathname: '/room/[id]/settings', params: { id } })}
+            />
           ) : (
-            <AppText variant="caption" muted>
+            <AppText variant="caption" color={colors.onPrimary} style={{ opacity: 0.85 }}>
               No budget set yet.
             </AppText>
           )}
           {inviteButton}
-        </Card>
+        </Appear>
       )}
       <Segmented
         options={[
@@ -134,6 +167,7 @@ export default function RoomScreen() {
 
   return (
     <View style={{ flex: 1 }}>
+      <Backdrop />
       <Stack.Screen
         options={{
           title: room.name,
@@ -150,20 +184,23 @@ export default function RoomScreen() {
           data={items}
           keyExtractor={(e) => e._id}
           contentContainerStyle={{ padding: spacing.lg, paddingBottom: listBottom }}
+          showsVerticalScrollIndicator={false}
           ListHeaderComponent={header}
-          refreshControl={<RefreshControl refreshing={expenses.isRefetching} onRefresh={refresh} />}
+          refreshControl={<RefreshControl refreshing={expenses.isRefetching} onRefresh={refresh} tintColor={colors.primary} colors={[colors.primary]} />}
           onEndReached={() => expenses.hasNextPage && void expenses.fetchNextPage()}
           ListEmptyComponent={expenses.isLoading ? <Loading /> : <EmptyState icon="receipt" title="No expenses yet" message="Add the first one with the + button." />}
-          renderItem={({ item }) => (
-            <ExpenseRow
-              expense={item}
-              me={r.me}
-              name={r.name}
-              isSplit={isSplit}
-              currency={room.currency}
-              category={item.categoryId ? byId.get(item.categoryId) : undefined}
-              onPress={() => router.push({ pathname: '/room/[id]/expense-detail', params: { id, expenseId: item._id } })}
-            />
+          renderItem={({ item, index }) => (
+            <Appear index={index}>
+              <ExpenseRow
+                expense={item}
+                me={r.me}
+                name={r.name}
+                isSplit={isSplit}
+                currency={room.currency}
+                category={item.categoryId ? byId.get(item.categoryId) : undefined}
+                onPress={() => router.push({ pathname: '/room/[id]/expense-detail', params: { id, expenseId: item._id } })}
+              />
+            </Appear>
           )}
         />
       ) : (
@@ -171,13 +208,14 @@ export default function RoomScreen() {
           data={[]}
           renderItem={null}
           contentContainerStyle={{ padding: spacing.lg, paddingBottom: listBottom }}
+          showsVerticalScrollIndicator={false}
           ListHeaderComponent={
             <>
               {header}
               {isSplit ? <BalancesView roomId={id} name={r.name} avatar={r.avatar} me={r.me} currency={room.currency} /> : <SummaryView roomId={id} name={r.name} avatar={r.avatar} currency={room.currency} />}
             </>
           }
-          refreshControl={<RefreshControl refreshing={false} onRefresh={refresh} />}
+          refreshControl={<RefreshControl refreshing={false} onRefresh={refresh} tintColor={colors.primary} colors={[colors.primary]} />}
         />
       )}
       {r.canAddExpense ? <Fab label="Add expense" safeBottom onPress={() => router.push({ pathname: '/room/[id]/expense', params: { id } })} /> : null}
@@ -210,9 +248,11 @@ function ExpenseRow({
   return (
     <Card onPress={onPress} style={{ marginBottom: spacing.sm }}>
       <Row gap={spacing.md}>
-        <CategoryIcon icon={category?.icon ?? 'receipt'} color={category?.color ?? colors.primary} size={36} />
+        <CategoryIcon icon={category?.icon ?? 'receipt'} color={category?.color ?? colors.primary} size={44} square />
         <View style={{ flex: 1 }}>
-          <AppText numberOfLines={1}>{expense.note || category?.name || 'Expense'}</AppText>
+          <AppText numberOfLines={1} style={{ fontWeight: '600' }}>
+            {expense.note || category?.name || 'Expense'}
+          </AppText>
           <AppText variant="caption" muted numberOfLines={1}>
             {payers} paid
           </AppText>

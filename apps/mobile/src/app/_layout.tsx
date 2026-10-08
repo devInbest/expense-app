@@ -8,7 +8,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { qk } from '@expense/api-client';
 import { compareVersions } from '@expense/shared';
-import { AppText, Button, EmptyState } from '@/components/ui';
+import { AppText, Backdrop, Button, EmptyState } from '@/components/ui';
 import { useAppLifecycle, useNotificationRouting, useScreenTracking } from '@/hooks/lifecycle';
 import { api } from '@/lib/api';
 import { AuthProvider, useAuth } from '@/lib/auth';
@@ -48,9 +48,12 @@ function RootNavigator() {
   useScreenTracking(signedIn);
   useNotificationRouting(onboarded);
 
+  const navTheme = dark ? DarkTheme : DefaultTheme;
+
   if (status === 'unreachable') {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', backgroundColor: colors.background }}>
+      <View style={{ flex: 1, justifyContent: 'center' }}>
+        <Backdrop />
         <EmptyState
           icon="cloud-off-outline"
           title="Can't reach the server"
@@ -62,7 +65,11 @@ function RootNavigator() {
   }
 
   return (
-    <ThemeProvider value={dark ? DarkTheme : DefaultTheme}>
+    <ThemeProvider
+      value={{
+        ...navTheme,
+        colors: { ...navTheme.colors, primary: colors.primary, background: colors.background, card: colors.background, text: colors.text, border: colors.border },
+      }}>
       <StatusBar style={dark ? 'light' : 'dark'} />
       <AppGate>
         <Stack
@@ -71,6 +78,7 @@ function RootNavigator() {
             headerShadowVisible: false,
             headerStyle: { backgroundColor: colors.background },
             headerTintColor: colors.text,
+            headerTitleStyle: { fontWeight: '700', fontSize: 17 },
             contentStyle: { backgroundColor: colors.background },
           }}>
           <Stack.Protected guard={!signedIn}>
@@ -113,7 +121,6 @@ function RootNavigator() {
 
 /** Blocks the app during maintenance or when this build is below the minimum supported version. */
 function AppGate({ children }: { children: ReactNode }) {
-  const { colors } = useTheme();
   const { data } = useQuery({ queryKey: qk.appSettings, queryFn: api.appSettings, staleTime: 5 * 60_000 });
 
   const outdated = data && compareVersions(config.appVersion, data.minAppVersion) < 0;
@@ -121,7 +128,8 @@ function AppGate({ children }: { children: ReactNode }) {
 
   const storeUrl = Platform.OS === 'ios' ? 'itms-apps://apps.apple.com' : 'market://details?id=com.expenseapp';
   return (
-    <View style={{ flex: 1, justifyContent: 'center', padding: spacing.xl, backgroundColor: colors.background }}>
+    <View style={{ flex: 1, justifyContent: 'center', padding: spacing.xl }}>
+      <Backdrop />
       {outdated ? (
         <EmptyState
           icon="cellphone-arrow-down"

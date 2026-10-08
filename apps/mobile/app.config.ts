@@ -71,7 +71,7 @@ const config: ExpoConfig = {
     'expo-localization',
     'expo-sharing',
     '@react-native-community/datetimepicker',
-    ['expo-notifications', { color: '#4F46E5' }],
+    ['expo-notifications', { color: '#FF4F0F' }],
     ['expo-image-picker', { photosPermission: 'Attach receipt photos to your expenses.' }],
     googleIosUrlScheme
       ? ['@react-native-google-signin/google-signin', { iosUrlScheme: googleIosUrlScheme }]

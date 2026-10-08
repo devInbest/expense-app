@@ -358,8 +358,9 @@ function MoneyCell({ value, onChange, suffix }: { value: string; onChange: (v: s
       style={{
         flexDirection: 'row',
         alignItems: 'center',
-        borderWidth: 1,
-        borderColor: colors.border,
+        borderWidth: 1.5,
+        borderColor: colors.glassBorder,
+        backgroundColor: colors.glass,
         borderRadius: radius.sm,
         paddingHorizontal: spacing.sm,
         width: 90,

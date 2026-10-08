@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { ActionSheetIOS, Alert, Platform, View } from 'react-native';
 import { PAYMENT_METHOD_VALUES, toMinor, type PaymentMethod, type TransactionType, LIMITS } from '@expense/shared';
 import { AmountInput, CategoryGrid, DateField } from '@/components/finance';
-import { Button, Chip, ErrorText, Field, Row, Screen, Section, Segmented } from '@/components/ui';
+import { Appear, Button, Chip, ErrorText, Field, Glass, Row, Screen, Section, Segmented } from '@/components/ui';
 import { useCategories } from '@/hooks/data';
 import { trackFeature } from '@/lib/analytics';
 import { errorMessage, isOffline } from '@/lib/api';
@@ -14,6 +14,7 @@ import { pickAndUploadImage } from '@/lib/uploads';
 import { radius, spacing } from '@/theme';
 
 const METHOD_LABEL: Record<PaymentMethod, string> = { cash: 'Cash', upi: 'UPI', card: 'Card', bank: 'Bank', other: 'Other' };
+const METHOD_ICON: Record<PaymentMethod, string> = { cash: 'cash', upi: 'qrcode-scan', card: 'credit-card-outline', bank: 'bank-outline', other: 'wallet-outline' };
 
 /** Add-only: saved transactions are read-only and open in the details page instead. */
 export default function TransactionForm() {
@@ -104,48 +105,58 @@ function NewTransactionForm() {
   return (
     <Screen edges={['bottom']} contentStyle={{ paddingBottom: spacing.lg }}>
       <Stack.Screen options={{ title: 'Add transaction' }} />
-      <Segmented
-        options={[
-          { value: 'expense', label: 'Expense' },
-          { value: 'income', label: 'Income' },
-        ]}
-        value={type}
-        onChange={(t) => {
-          setType(t);
-          setCategoryId(undefined);
-        }}
-      />
-      <AmountInput value={amount} onChange={setAmount} currency={currency} autoFocus />
+      <Appear>
+        <Glass blur style={{ padding: spacing.md, gap: spacing.xs }} rounded={radius.xl}>
+          <Segmented
+            glass
+            options={[
+              { value: 'expense', label: 'Expense' },
+              { value: 'income', label: 'Income' },
+            ]}
+            value={type}
+            onChange={(t) => {
+              setType(t);
+              setCategoryId(undefined);
+            }}
+          />
+          <AmountInput value={amount} onChange={setAmount} currency={currency} autoFocus />
+        </Glass>
+      </Appear>
 
-      <Section title="Category">
-        <CategoryGrid categories={visibleCategories} value={categoryId} onChange={setCategoryId} />
-      </Section>
+      <Appear index={1}>
+        <Section title="Category">
+          <CategoryGrid categories={visibleCategories} value={categoryId} onChange={setCategoryId} />
+        </Section>
+      </Appear>
 
-      <Field label="Note" value={note} onChangeText={setNote} placeholder="What was it for?" maxLength={280} />
+      <Appear index={2} style={{ gap: spacing.lg }}>
+        <Field label="Note" value={note} onChangeText={setNote} placeholder="What was it for?" maxLength={280} />
 
-      <Section title="Paid with">
-        <Row style={{ flexWrap: 'wrap' }}>
-          {PAYMENT_METHOD_VALUES.map((m) => (
-            <Chip key={m} label={METHOD_LABEL[m]} selected={method === m} onPress={() => setMethod(m)} />
-          ))}
-        </Row>
-      </Section>
+        <Section title={type === 'income' ? 'Received via' : 'Paid with'}>
+          <Row style={{ flexWrap: 'wrap' }}>
+            {PAYMENT_METHOD_VALUES.map((m) => (
+              <Chip key={m} label={METHOD_LABEL[m]} icon={METHOD_ICON[m]} selected={method === m} onPress={() => setMethod(m)} />
+            ))}
+          </Row>
+        </Section>
 
-      <DateField label="Date" value={date} onChange={setDate} maximumDate={maxDate} />
+        <DateField label="Date" value={date} onChange={setDate} maximumDate={maxDate} />
 
-      <Section title="Receipt">
-        {receiptUrl ? (
-          <View style={{ gap: spacing.sm }}>
-            <Image source={{ uri: receiptUrl }} style={{ width: '100%', height: 200, borderRadius: radius.md }} contentFit="cover" />
-            <Button title="Remove receipt" variant="ghost" compact onPress={() => setReceiptUrl(null)} />
-          </View>
-        ) : (
-          <Button title="Attach receipt" icon="camera-outline" variant="secondary" loading={uploading} onPress={chooseReceiptSource} />
-        )}
-      </Section>
-
-      <ErrorText>{error}</ErrorText>
-      <Button title="Save" onPress={save} loading={saving} />
+        <View style={{ gap: spacing.sm }}>
+          <Section title="Receipt">
+            {receiptUrl ? (
+              <View style={{ gap: spacing.sm }}>
+                <Image source={{ uri: receiptUrl }} style={{ width: '100%', height: 200, borderRadius: radius.lg }} contentFit="cover" />
+                <Button title="Remove receipt" variant="ghost" compact onPress={() => setReceiptUrl(null)} />
+              </View>
+            ) : (
+              <Button title="Attach receipt" icon="camera-outline" variant="glass" loading={uploading} onPress={chooseReceiptSource} />
+            )}
+          </Section>
+          <ErrorText>{error}</ErrorText>
+          <Button title="Save" icon="check" onPress={save} loading={saving} />
+        </View>
+      </Appear>
     </Screen>
   );
 }

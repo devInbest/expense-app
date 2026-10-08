@@ -1,18 +1,55 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Pressable, RefreshControl, View } from 'react-native';
+import { Alert, RefreshControl, View } from 'react-native';
 import { qk } from '@expense/api-client';
 import { formatMoney } from '@expense/shared';
-import { AppText, Banner, Button, Card, EmptyState, ErrorState, Field, Icon, IconButton, Loading, Row, Screen, Sheet } from '@/components/ui';
+import {
+  AppText,
+  Appear,
+  Banner,
+  Button,
+  Card,
+  EmptyState,
+  ErrorState,
+  Field,
+  Glass,
+  Icon,
+  IconButton,
+  linearGradient,
+  Loading,
+  Row,
+  Screen,
+  Sheet,
+  useTabBarInset,
+} from '@/components/ui';
 import { api, errorMessage } from '@/lib/api';
 import { useUser } from '@/lib/auth';
-import { spacing, useTheme } from '@/theme';
+import { radius, spacing, useTheme } from '@/theme';
 
 const LONG_PRESS_MS = 1000;
 
+function SummaryTile({ label, icon, tone, value }: { label: string; icon: string; tone: string; value: string }) {
+  return (
+    <Glass style={{ flex: 1, padding: spacing.md, gap: spacing.sm }}>
+      <Row gap={spacing.sm}>
+        <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: `${tone}1F`, alignItems: 'center', justifyContent: 'center' }}>
+          <Icon name={icon} size={16} color={tone} />
+        </View>
+        <AppText variant="caption" muted style={{ fontWeight: '600' }}>
+          {label}
+        </AppText>
+      </Row>
+      <AppText variant="subheading" color={tone} numberOfLines={1} adjustsFontSizeToFit style={{ fontWeight: '800', fontVariant: ['tabular-nums'] }}>
+        {value}
+      </AppText>
+    </Glass>
+  );
+}
+
 export default function Rooms() {
   const { colors } = useTheme();
+  const tabInset = useTabBarInset();
   const user = useUser();
   const queryClient = useQueryClient();
   const [showArchived, setShowArchived] = useState(false);
@@ -70,61 +107,43 @@ export default function Rooms() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <Screen contentStyle={{ flexGrow: 1, paddingBottom: spacing.lg }} refreshControl={<RefreshControl refreshing={rooms.isRefetching} onRefresh={refresh} />}>
-        <Row>
-          <AppText variant={selected.size ? 'subheading' : 'title'} style={{ flex: 1 }}>
-            {selected.size ? `${selected.size} selected` : 'Rooms'}
-          </AppText>
-          {selected.size ? (
-            <>
-              <IconButton icon="close" label="Clear selection" onPress={() => setSelected(new Set())} />
-              <IconButton icon="trash-can-outline" label="Delete selected rooms" color={colors.danger} onPress={confirmDelete} />
-            </>
-          ) : (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={showArchived ? 'Show active rooms' : 'Show archived rooms'}
-              accessibilityState={{ selected: showArchived }}
-              hitSlop={8}
-              onPress={() => setShowArchived((v) => !v)}
-              style={({ pressed }) => ({
-                width: 36,
-                height: 36,
-                borderRadius: 18,
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: showArchived ? colors.primary : colors.surfaceAlt,
-                opacity: pressed ? 0.7 : 1,
-              })}>
-              <Icon name={showArchived ? 'archive' : 'archive-outline'} size={20} color={showArchived ? colors.onPrimary : colors.textMuted} />
-            </Pressable>
-          )}
-        </Row>
+    <View style={{ flex: 1 }}>
+      <Screen
+        contentStyle={{ flexGrow: 1, paddingBottom: tabInset + 90 }}
+        refreshControl={<RefreshControl refreshing={rooms.isRefetching} onRefresh={refresh} tintColor={colors.primary} colors={[colors.primary]} />}>
+        <Appear>
+          <Row>
+            <AppText variant={selected.size ? 'heading' : 'title'} style={{ flex: 1 }}>
+              {selected.size ? `${selected.size} selected` : showArchived ? 'Archived' : 'Rooms'}
+            </AppText>
+            {selected.size ? (
+              <>
+                <IconButton glass icon="close" label="Clear selection" onPress={() => setSelected(new Set())} />
+                <IconButton glass icon="trash-can-outline" label="Delete selected rooms" color={colors.danger} onPress={confirmDelete} />
+              </>
+            ) : (
+              <IconButton
+                glass
+                icon={showArchived ? 'archive' : 'archive-outline'}
+                label={showArchived ? 'Show active rooms' : 'Show archived rooms'}
+                color={showArchived ? colors.primary : colors.textMuted}
+                onPress={() => setShowArchived((v) => !v)}
+              />
+            )}
+          </Row>
+        </Appear>
 
         {invites.data?.length ? (
           <Banner icon="email-outline" text={`${invites.data.length} pending invite${invites.data.length > 1 ? 's' : ''}`} onPress={() => router.push('/invites')} />
         ) : null}
 
         {!showArchived && splitRooms.length ? (
-          <Row gap={spacing.md}>
-            <Card style={{ flex: 1, alignItems: 'center', gap: spacing.xs }}>
-              <AppText variant="caption" muted>
-                You paid
-              </AppText>
-              <AppText variant="subheading" color={colors.success} style={{ fontVariant: ['tabular-nums'] }}>
-                {sumLabel('paid')}
-              </AppText>
-            </Card>
-            <Card style={{ flex: 1, alignItems: 'center', gap: spacing.xs }}>
-              <AppText variant="caption" muted>
-                Remaining balance
-              </AppText>
-              <AppText variant="subheading" color={colors.danger} style={{ fontVariant: ['tabular-nums'] }}>
-                {sumLabel('remaining')}
-              </AppText>
-            </Card>
-          </Row>
+          <Appear index={1}>
+            <Row gap={spacing.md}>
+              <SummaryTile label="You paid" icon="check-decagram-outline" tone={colors.success} value={sumLabel('paid')} />
+              <SummaryTile label="Remaining" icon="clock-outline" tone={colors.primary} value={sumLabel('remaining')} />
+            </Row>
+          </Appear>
         ) : null}
 
         {rooms.isLoading ? (
@@ -132,58 +151,80 @@ export default function Rooms() {
         ) : rooms.error ? (
           <ErrorState message={errorMessage(rooms.error)} onRetry={() => void rooms.refetch()} />
         ) : visibleRooms.length ? (
-          visibleRooms.map((r) => {
+          visibleRooms.map((r, i) => {
             const bal = r.myBalance ?? 0;
             const selectable = showArchived && r.myRole === 'owner';
             const isSelected = selected.has(r._id);
+            const tone = bal > 0 ? colors.success : colors.danger;
             return (
-              <Card
-                key={r._id}
-                style={isSelected ? { borderWidth: 2, borderColor: colors.primary } : undefined}
-                delayLongPress={LONG_PRESS_MS}
-                onLongPress={selectable ? () => toggleSelected(r._id) : undefined}
-                onPress={() =>
-                  selected.size && selectable ? toggleSelected(r._id) : router.push({ pathname: '/room/[id]', params: { id: r._id } })
-                }>
-                <Row gap={spacing.md}>
-                  <View
-                    style={{
-                      width: 44,
-                      height: 44,
-                      borderRadius: 14,
-                      backgroundColor: isSelected ? colors.primary : colors.primaryMuted,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}>
-                    <Icon name={isSelected ? 'check' : r.icon} color={isSelected ? colors.surface : colors.primary} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <AppText variant="subheading" numberOfLines={1}>
-                      {r.name}
-                    </AppText>
-                    <AppText variant="caption" muted>
-                      {r.memberCount ?? 1} member{(r.memberCount ?? 1) > 1 ? 's' : ''}
-                    </AppText>
-                  </View>
-                  {r.type === 'split' && bal !== 0 ? (
-                    <AppText color={bal > 0 ? colors.success : colors.danger} style={{ fontWeight: '600' }}>
-                      {formatMoney(Math.abs(bal), r.currency)}
-                    </AppText>
-                  ) : null}
-                </Row>
-              </Card>
+              <Appear key={r._id} index={i + 2}>
+                <Card
+                  style={isSelected ? { borderWidth: 2, borderColor: colors.primary } : undefined}
+                  delayLongPress={LONG_PRESS_MS}
+                  onLongPress={selectable ? () => toggleSelected(r._id) : undefined}
+                  onPress={() =>
+                    selected.size && selectable ? toggleSelected(r._id) : router.push({ pathname: '/room/[id]', params: { id: r._id } })
+                  }>
+                  <Row gap={spacing.md}>
+                    <View
+                      style={{
+                        width: 50,
+                        height: 50,
+                        borderRadius: 16,
+                        backgroundColor: colors.primary,
+                        experimental_backgroundImage: linearGradient('#FF7A45', colors.primaryDeep),
+                        boxShadow: `0 6px 14px ${colors.primaryGlow}`,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}>
+                      <Icon name={isSelected ? 'check' : r.icon} color={colors.onPrimary} />
+                    </View>
+                    <View style={{ flex: 1, gap: 2 }}>
+                      <AppText variant="subheading" numberOfLines={1}>
+                        {r.name}
+                      </AppText>
+                      <Row gap={4}>
+                        <Icon name="account-multiple-outline" size={14} color={colors.textMuted} />
+                        <AppText variant="caption" muted>
+                          {r.memberCount ?? 1} member{(r.memberCount ?? 1) > 1 ? 's' : ''}
+                        </AppText>
+                      </Row>
+                    </View>
+                    {r.type === 'split' && bal !== 0 ? (
+                      <View style={{ alignItems: 'flex-end', gap: 2 }}>
+                        <View style={{ backgroundColor: `${tone}1A`, borderRadius: radius.pill, paddingHorizontal: spacing.sm + 2, paddingVertical: 4 }}>
+                          <AppText color={tone} style={{ fontWeight: '800', fontVariant: ['tabular-nums'] }}>
+                            {formatMoney(Math.abs(bal), r.currency)}
+                          </AppText>
+                        </View>
+                        <AppText variant="caption" muted style={{ fontSize: 11 }}>
+                          {bal > 0 ? 'you get back' : 'you owe'}
+                        </AppText>
+                      </View>
+                    ) : (
+                      <Icon name="chevron-right" size={20} color={colors.textSubtle} />
+                    )}
+                  </Row>
+                </Card>
+              </Appear>
             );
           })
         ) : (
           <View style={{ flex: 1, justifyContent: 'center' }}>
-            <EmptyState icon="account-group-outline" title={showArchived ? 'No archived rooms' : 'No rooms yet'} />
+            <EmptyState
+              icon="account-group-outline"
+              title={showArchived ? 'No archived rooms' : 'No rooms yet'}
+              message={showArchived ? undefined : 'Create a room to share expenses with friends, family or flatmates.'}
+            />
           </View>
         )}
       </Screen>
-      <Row style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.sm }}>
-        <Button title="Create Room" style={{ flex: 1 }} onPress={() => router.push('/room/new')} />
-        <Button title="Join Room" variant="secondary" style={{ flex: 1 }} onPress={() => setJoinOpen(true)} />
-      </Row>
+      <View pointerEvents="box-none" style={{ position: 'absolute', left: spacing.lg, right: spacing.lg, bottom: tabInset }}>
+        <Glass rounded={999} style={{ flexDirection: 'row', gap: spacing.sm, padding: 6, backgroundColor: colors.surface }}>
+          <Button title="Create Room" icon="plus" style={{ flex: 1 }} onPress={() => router.push('/room/new')} />
+          <Button title="Join Room" icon="link-variant" variant="secondary" style={{ flex: 1 }} onPress={() => setJoinOpen(true)} />
+        </Glass>
+      </View>
       {joinOpen ? <JoinSheet onClose={() => setJoinOpen(false)} /> : null}
     </View>
   );
@@ -203,7 +244,7 @@ function JoinSheet({ onClose }: { onClose: () => void }) {
   return (
     <Sheet visible title="Join a room" onClose={onClose}>
       <Field label="Invite code or link" value={code} onChangeText={setCode} autoCapitalize="characters" autoCorrect={false} autoFocus placeholder="e.g. K7Q2M9XD" />
-      <Button title="Continue" onPress={submit} />
+      <Button title="Continue" icon="arrow-right" onPress={submit} />
     </Sheet>
   );
 }

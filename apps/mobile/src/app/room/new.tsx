@@ -102,10 +102,21 @@ export default function NewRoom() {
                 padding: spacing.lg,
                 borderRadius: radius.lg,
                 borderWidth: 2,
-                borderColor: selected ? colors.primary : colors.border,
-                backgroundColor: selected ? colors.primaryMuted : colors.surface,
+                borderColor: selected ? colors.primary : colors.glassBorder,
+                backgroundColor: selected ? colors.primaryMuted : colors.glass,
+                boxShadow: selected ? `0 8px 22px ${colors.glow}` : `0 6px 18px ${colors.shadow}`,
               }}>
-              <Icon name={t.icon} color={selected ? colors.primary : colors.textMuted} size={28} />
+              <View
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 14,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: selected ? colors.primary : colors.surfaceAlt,
+                }}>
+                <Icon name={t.icon} color={selected ? colors.onPrimary : colors.textMuted} size={24} />
+              </View>
               <View style={{ flex: 1, gap: 2 }}>
                 <AppText variant="subheading">{t.title}</AppText>
                 <AppText variant="caption" muted>
@@ -135,8 +146,8 @@ export default function NewRoom() {
                   justifyContent: 'center',
                   borderRadius: radius.md,
                   borderWidth: 1.5,
-                  borderColor: i === icon ? colors.primary : colors.border,
-                  backgroundColor: i === icon ? colors.primaryMuted : undefined,
+                  borderColor: i === icon ? colors.primary : colors.glassBorder,
+                  backgroundColor: i === icon ? colors.primaryMuted : colors.glass,
                 }}>
                 <Icon name={i} color={i === icon ? colors.primary : colors.textMuted} />
               </Pressable>
@@ -145,7 +156,7 @@ export default function NewRoom() {
         </View>
       </Section>
       <ErrorText>{error}</ErrorText>
-      <Button title="Create room" onPress={() => create.mutate()} loading={create.isPending} />
+      <Button title="Create room" icon="plus" onPress={() => create.mutate()} loading={create.isPending} />
     </Screen>
   );
 }

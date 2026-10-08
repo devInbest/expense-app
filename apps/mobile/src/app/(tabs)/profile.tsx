@@ -1,10 +1,27 @@
 import { useMutation } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Platform, View } from 'react-native';
+import { Alert, Platform, Pressable, View } from 'react-native';
 import { isUpiNumber, upiIdSchema, type NotificationPrefs } from '@expense/shared';
 import { ProfilePhoto } from '@/components/ProfilePhoto';
-import { AppText, Button, Card, Divider, ErrorText, Field, ListItem, Row, Screen, Section, Segmented, Sheet, ToggleRow } from '@/components/ui';
+import {
+  AppText,
+  Appear,
+  Button,
+  Card,
+  Divider,
+  ErrorText,
+  Field,
+  Glass,
+  Icon,
+  ListItem,
+  Screen,
+  Section,
+  Segmented,
+  Sheet,
+  ToggleRow,
+  useTabBarInset,
+} from '@/components/ui';
 import { useSyncStatus } from '@/hooks/data';
 import { api, errorMessage, showError } from '@/lib/api';
 import { useAuth, useUser } from '@/lib/auth';
@@ -12,7 +29,7 @@ import { config } from '@/lib/config';
 import { timeAgo } from '@/lib/dates';
 import { syncNow } from '@/lib/sync';
 import { setThemeMode, useThemeMode } from '@/lib/themeMode';
-import { spacing } from '@/theme';
+import { spacing, useTheme } from '@/theme';
 
 const PREFS: { key: keyof NotificationPrefs; label: string }[] = [
   { key: 'roomActivity', label: 'Room activity' },
@@ -23,6 +40,8 @@ const PREFS: { key: keyof NotificationPrefs; label: string }[] = [
 
 export default function Profile() {
   const user = useUser();
+  const { colors } = useTheme();
+  const tabInset = useTabBarInset();
   const { signOut, setUser } = useAuth();
   const sync = useSyncStatus();
   const themeMode = useThemeMode();
@@ -84,16 +103,45 @@ export default function Profile() {
     );
 
   return (
-    <Screen contentStyle={{ paddingBottom: spacing.lg }}>
-      <Card onPress={() => router.push('/account')}>
-        <Row gap={spacing.md}>
-          <ProfilePhoto size={60} />
-          <View style={{ flex: 1 }}>
-            <AppText variant="heading">{user.name}</AppText>
-            <AppText muted>{user.phone ?? user.email ?? (user.username ? `@${user.username}` : '')}</AppText>
-          </View>
-        </Row>
-      </Card>
+    <Screen contentStyle={{ paddingBottom: tabInset + spacing.lg }}>
+      <Appear>
+        <Glass blur rounded={30} style={{ alignItems: 'center', padding: spacing.xl, gap: spacing.sm, overflow: 'hidden' }}>
+          <View
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              top: -120,
+              width: 320,
+              height: 220,
+              experimental_backgroundImage: `radial-gradient(circle at center, ${colors.glow} 0%, rgba(255,79,15,0) 70%)`,
+            }}
+          />
+          <ProfilePhoto size={92} />
+          <AppText variant="heading" style={{ marginTop: spacing.xs }}>
+            {user.name}
+          </AppText>
+          <AppText muted>{user.phone ?? user.email ?? (user.username ? `@${user.username}` : '')}</AppText>
+          <Pressable
+            onPress={() => router.push('/account')}
+            accessibilityRole="button"
+            style={({ pressed }) => ({
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 6,
+              marginTop: spacing.xs,
+              backgroundColor: colors.primaryMuted,
+              borderRadius: 999,
+              paddingHorizontal: spacing.lg,
+              paddingVertical: spacing.sm,
+              opacity: pressed ? 0.7 : 1,
+            })}>
+            <Icon name="pencil-outline" size={16} color={colors.primary} />
+            <AppText variant="caption" color={colors.primary} style={{ fontWeight: '700' }}>
+              Edit profile
+            </AppText>
+          </Pressable>
+        </Glass>
+      </Appear>
 
       <Section title="Appearance">
         <Segmented
@@ -164,8 +212,8 @@ export default function Profile() {
         </Card>
       </Section>
 
-      <Button title="Sign out" variant="secondary" onPress={confirmSignOut} />
-      <Button title="Delete account" variant="danger" onPress={deleteAccount} />
+      <Button title="Sign out" icon="logout" variant="secondary" onPress={confirmSignOut} />
+      <Button title="Delete account" icon="delete-outline" variant="danger" onPress={deleteAccount} />
       <AppText variant="caption" muted style={{ textAlign: 'center' }}>
         Version {config.appVersion} · {Platform.OS}
       </AppText>

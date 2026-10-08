@@ -1,10 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Alert, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { ApiClientError, qk } from '@expense/api-client';
 import type { RoomMemberDTO } from '@expense/shared';
-import { AppText, Avatar, Button, Card, Divider, ErrorState, ListItem, Loading, Row, Screen, Section } from '@/components/ui';
+import { AppText, BottomBar, Avatar, Button, Card, Divider, ErrorState, ListItem, Loading, Row, Screen, Section } from '@/components/ui';
 import { useRoom } from '@/hooks/rooms';
 import { api, errorMessage, showError } from '@/lib/api';
 import { timeAgo } from '@/lib/dates';
@@ -118,7 +117,7 @@ export default function Members() {
   const former = r.members.filter((m) => m.status !== 'active');
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
+    <View style={{ flex: 1 }}>
       <Screen edges={[]} contentStyle={{ paddingBottom: spacing.lg }}>
         <Section title={`Members (${r.active.length})`}>
           <Card>
@@ -174,7 +173,7 @@ export default function Members() {
           </Section>
         ) : null}
       </Screen>
-      <SafeAreaView edges={['bottom']} style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.sm }}>
+      <BottomBar>
         <Row>
           {r.canInvite ? (
             <Button
@@ -202,7 +201,7 @@ export default function Members() {
             }
           />
         </Row>
-      </SafeAreaView>
+      </BottomBar>
     </View>
   );
 }

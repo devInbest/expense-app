@@ -2,12 +2,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { qk } from '@expense/api-client';
 import { computeExpenseDebts, formatMoney, type PaymentMethod, type RoomExpenseDTO } from '@expense/shared';
 import { Money } from '@/components/finance';
 import { PaySheet, type PayDetails } from '@/components/PaySheet';
-import { AppText, Avatar, Button, Card, CategoryIcon, ErrorState, Icon, Loading, Row, Screen, Section } from '@/components/ui';
+import { AppText, BottomBar, Avatar, Button, Card, CategoryIcon, ErrorState, Icon, Loading, Row, Screen, Section } from '@/components/ui';
 import { useCategories } from '@/hooks/data';
 import { useRoom } from '@/hooks/rooms';
 import { api, errorMessage } from '@/lib/api';
@@ -80,7 +79,7 @@ export default function RoomExpenseDetail() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
+    <View style={{ flex: 1 }}>
       <Screen edges={[]} contentStyle={{ paddingBottom: spacing.lg }}>
         <Card style={{ alignItems: 'center', paddingVertical: spacing.xl, gap: spacing.xs }}>
           <CategoryIcon icon={category?.icon ?? 'receipt'} color={category?.color ?? colors.primary} size={56} />
@@ -166,7 +165,7 @@ export default function RoomExpenseDetail() {
         ) : null}
       </Screen>
       {canEdit ? (
-        <SafeAreaView edges={['bottom']} style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.sm }}>
+        <BottomBar>
           <Button
             title="Edit expense"
             onPress={() =>
@@ -176,7 +175,7 @@ export default function RoomExpenseDetail() {
               })
             }
           />
-        </SafeAreaView>
+        </BottomBar>
       ) : null}
       {paying ? <PaySheet visible onClose={() => setPaying(null)} payment={paying} /> : null}
     </View>
