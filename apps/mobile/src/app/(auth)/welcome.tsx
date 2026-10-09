@@ -2,7 +2,7 @@ import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import Animated, { FadeInDown, FadeInUp, useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
-import { AppText, Button, Glass, Icon, linearGradient, Row, Screen } from '@/components/ui';
+import { AppText, Button, Glass, Icon, linearGradient, MOTION, Row, Screen } from '@/components/ui';
 import { api, showError } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { getGoogleIdToken, isGoogleConfigured } from '@/lib/google';
@@ -23,7 +23,7 @@ function FloatingChip({ icon, label, index }: { icon: string; label: string; ind
   }, [y, index]);
   const style = useAnimatedStyle(() => ({ transform: [{ translateY: y.get() }] }));
   return (
-    <Animated.View entering={FadeInUp.delay(400 + index * 120).springify().damping(16)} style={style}>
+    <Animated.View entering={FadeInUp.delay(400 + index * 120).duration(450).easing(MOTION.easing)} style={style}>
       <Glass rounded={999} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: spacing.md, paddingVertical: 8 }}>
         <Icon name={icon} size={16} color={colors.primary} />
         <AppText variant="caption" style={{ fontWeight: '700' }}>
@@ -60,7 +60,7 @@ export default function Welcome() {
   return (
     <Screen scroll={false} edges={['top', 'bottom']}>
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', gap: spacing.xl }}>
-        <Animated.View entering={FadeInDown.duration(600).springify().damping(14)} style={logo}>
+        <Animated.View entering={FadeInDown.duration(600).easing(MOTION.easing)} style={logo}>
           <View
             style={{
               width: 112,
@@ -94,7 +94,7 @@ export default function Welcome() {
         </Row>
       </View>
 
-      <Animated.View entering={FadeInUp.delay(300).duration(500).springify().damping(18)}>
+      <Animated.View entering={FadeInUp.delay(300).duration(500).easing(MOTION.easing)}>
         <Glass blur style={{ padding: spacing.lg, gap: spacing.md }} rounded={30}>
           <Button title="Continue with phone" icon="cellphone" onPress={() => router.push('/phone')} />
           {isGoogleConfigured() ? (

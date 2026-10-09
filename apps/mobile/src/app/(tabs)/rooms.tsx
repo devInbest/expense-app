@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { useState } from 'react';
-import { Alert, RefreshControl, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Alert, BackHandler, RefreshControl, View } from 'react-native';
 import { qk } from '@expense/api-client';
 import { formatMoney } from '@expense/shared';
 import {
@@ -69,6 +69,20 @@ export default function Rooms() {
   const sumLabel = (key: 'paid' | 'remaining') =>
     [...totals].map(([currency, t]) => formatMoney(t[key], currency)).join(' + ') || formatMoney(0, user.defaultCurrency);
 
+  const closeArchived = () => {
+    setShowArchived(false);
+    setSelected(new Set());
+  };
+
+  useEffect(() => {
+    if (!showArchived) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      closeArchived();
+      return true;
+    });
+    return () => sub.remove();
+  }, [showArchived]);
+
   const refresh = () => {
     void rooms.refetch();
     void invites.refetch();
@@ -113,6 +127,7 @@ export default function Rooms() {
         refreshControl={<RefreshControl refreshing={rooms.isRefetching} onRefresh={refresh} tintColor={colors.primary} colors={[colors.primary]} />}>
         <Appear>
           <Row>
+            {showArchived && !selected.size ? <IconButton glass icon="arrow-left" label="Back to rooms" onPress={closeArchived} /> : null}
             <AppText variant={selected.size ? 'heading' : 'title'} style={{ flex: 1 }}>
               {selected.size ? `${selected.size} selected` : showArchived ? 'Archived' : 'Rooms'}
             </AppText>
@@ -121,14 +136,8 @@ export default function Rooms() {
                 <IconButton glass icon="close" label="Clear selection" onPress={() => setSelected(new Set())} />
                 <IconButton glass icon="trash-can-outline" label="Delete selected rooms" color={colors.danger} onPress={confirmDelete} />
               </>
-            ) : (
-              <IconButton
-                glass
-                icon={showArchived ? 'archive' : 'archive-outline'}
-                label={showArchived ? 'Show active rooms' : 'Show archived rooms'}
-                color={showArchived ? colors.primary : colors.textMuted}
-                onPress={() => setShowArchived((v) => !v)}
-              />
+            ) : showArchived ? null : (
+              <IconButton glass icon="archive-outline" label="Show archived rooms" color={colors.textMuted} onPress={() => setShowArchived(true)} />
             )}
           </Row>
         </Appear>
@@ -219,12 +228,14 @@ export default function Rooms() {
           </View>
         )}
       </Screen>
-      <View pointerEvents="box-none" style={{ position: 'absolute', left: spacing.lg, right: spacing.lg, bottom: tabInset }}>
-        <Glass rounded={999} style={{ flexDirection: 'row', gap: spacing.sm, padding: 6, backgroundColor: colors.surface }}>
-          <Button title="Create Room" icon="plus" style={{ flex: 1 }} onPress={() => router.push('/room/new')} />
-          <Button title="Join Room" icon="link-variant" variant="secondary" style={{ flex: 1 }} onPress={() => setJoinOpen(true)} />
-        </Glass>
-      </View>
+      {showArchived ? null : (
+        <View pointerEvents="box-none" style={{ position: 'absolute', left: spacing.lg, right: spacing.lg, bottom: tabInset }}>
+          <Glass rounded={999} style={{ flexDirection: 'row', gap: spacing.sm, padding: 6, backgroundColor: colors.surface }}>
+            <Button title="Create Room" icon="plus" style={{ flex: 1 }} onPress={() => router.push('/room/new')} />
+            <Button title="Join Room" icon="link-variant" variant="secondary" style={{ flex: 1 }} onPress={() => setJoinOpen(true)} />
+          </Glass>
+        </View>
+      )}
       {joinOpen ? <JoinSheet onClose={() => setJoinOpen(false)} /> : null}
     </View>
   );

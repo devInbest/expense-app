@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
-import Animated, { useAnimatedStyle, useSharedValue, withDelay, withSpring } from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
 import { formatMoney } from '@expense/shared';
 import { spacing, useTheme } from '@/theme';
-import { AppText } from './ui';
+import { AppText, MOTION } from './ui';
 
 type Period = 'week' | 'month' | 'year';
 type Bucket = { key: string; label: string; title: string; value: number };
@@ -42,7 +42,7 @@ const buildBuckets = (period: Period, from: Date, to: Date, values: Map<string, 
 function Bar({ height, index, color, empty, dimmed }: { height: number; index: number; color: string; empty: string; dimmed: boolean }) {
   const h = useSharedValue(4);
   useEffect(() => {
-    h.set(withDelay(index * 18, withSpring(height, { damping: 15, stiffness: 140 })));
+    h.set(withDelay(index * 18, withTiming(height, { duration: 400, easing: MOTION.easing })));
   }, [h, height, index]);
   const style = useAnimatedStyle(() => ({ height: h.get() }));
   const filled = height > 4;

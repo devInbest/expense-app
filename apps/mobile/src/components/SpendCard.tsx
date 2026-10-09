@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { formatMoney } from '@expense/shared';
 import { radius, spacing, useTheme } from '@/theme';
-import { AppText, Icon, linearGradient, Row } from './ui';
+import { AppText, Icon, linearGradient, MOTION, Row } from './ui';
 
 const INK = '#FFFFFF';
 const FROST = 'rgba(255,255,255,0.18)';
@@ -48,7 +48,7 @@ export function SpendCard({ spent, income, currency, month }: { spent: number; i
   const shownSpent = useCountUp(spent);
   return (
     <Animated.View
-      entering={FadeInDown.duration(500).springify().damping(16)}
+      entering={FadeInDown.duration(500).easing(MOTION.easing)}
       style={{
         borderRadius: radius.xl,
         padding: spacing.lg + 2,

@@ -2,9 +2,9 @@ import * as Haptics from 'expo-haptics';
 import type { BottomTabBarProps } from 'expo-router/tabs';
 import { useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { radius, spacing, useTheme } from '@/theme';
-import { BackdropSlice, linearGradient, SPRING, TAB_BAR_BOTTOM_GAP, TAB_BAR_FADE, TAB_BAR_HEIGHT } from './ui';
+import { BackdropSlice, linearGradient, MOTION, TAB_BAR_BOTTOM_GAP, TAB_BAR_FADE, TAB_BAR_HEIGHT } from './ui';
 
 const PAD = 5;
 
@@ -24,7 +24,7 @@ function TabItem({
   const { colors } = useTheme();
   const lift = useSharedValue(focused ? 1 : 0);
   useEffect(() => {
-    lift.set(withSpring(focused ? 1 : 0, SPRING));
+    lift.set(withTiming(focused ? 1 : 0, MOTION));
   }, [focused, lift]);
   const iconStyle = useAnimatedStyle(() => ({ transform: [{ scale: 1 + lift.get() * 0.08 }, { translateY: -lift.get() * 1 }] }));
   const color = focused ? colors.onPrimary : colors.textMuted;
@@ -51,7 +51,7 @@ export function GlassTabBar({ state, descriptors, navigation, insets }: BottomTa
   const segment = width > 0 ? (width - PAD * 2) / state.routes.length : 0;
   const x = useSharedValue(0);
   useEffect(() => {
-    x.set(withSpring(state.index * segment, SPRING));
+    x.set(withTiming(state.index * segment, MOTION));
   }, [state.index, segment, x]);
   const indicator = useAnimatedStyle(() => ({ transform: [{ translateX: x.get() }] }));
 

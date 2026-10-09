@@ -1,7 +1,7 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { BlurView } from 'expo-blur';
 import { Image } from 'expo-image';
-import { useEffect, useState, type ComponentProps, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, type ComponentProps, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -12,6 +12,8 @@ import {
   Text,
   TextInput,
   View,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
   type PressableProps,
   type ScrollViewProps,
   type StyleProp,
@@ -26,19 +28,26 @@ import Animated, {
   FadeIn,
   FadeInDown,
   makeMutable,
+  measure,
+  useAnimatedReaction,
+  useAnimatedRef,
+  useAnimatedScrollHandler,
   useAnimatedStyle,
   useSharedValue,
+  withDelay,
   withRepeat,
   withSequence,
-  withSpring,
   withTiming,
+  type AnimatedRef,
+  type SharedValue,
 } from 'react-native-reanimated';
+import { scheduleOnUI } from 'react-native-worklets';
 import { SafeAreaView, useSafeAreaFrame, useSafeAreaInsets, type Edge } from 'react-native-safe-area-context';
 import { radius, spacing, useTheme } from '@/theme';
 
 export type IconName = ComponentProps<typeof MaterialCommunityIcons>['name'];
 
-export const SPRING = { damping: 16, stiffness: 220, mass: 0.6 } as const;
+export const MOTION = { duration: 280, easing: Easing.out(Easing.cubic) };
 export const TAB_BAR_HEIGHT = 64;
 /** Height of the fade above the tab bar strip. */
 export const TAB_BAR_FADE = 14;
@@ -57,14 +66,14 @@ export const linearGradient = (from: string, to: string, angle = 135) => `linear
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-/** Spring scale-down while pressed. */
+/** Eased scale-down while pressed. */
 export function usePressScale(to = 0.97) {
   const scale = useSharedValue(1);
   const style = useAnimatedStyle(() => ({ transform: [{ scale: scale.get() }] }));
   return {
     style,
-    onPressIn: () => scale.set(withSpring(to, SPRING)),
-    onPressOut: () => scale.set(withSpring(1, SPRING)),
+    onPressIn: () => scale.set(withTiming(to, MOTION)),
+    onPressOut: () => scale.set(withTiming(1, MOTION)),
   };
 }
 
@@ -75,12 +84,127 @@ export const Icon = ({ name, size = 22, color }: { name: string; size?: number; 
 };
 
 // ---------- motion ----------
-/** Fades and slides children in on mount; `index` staggers siblings. */
+/** Vertical scroll offset of the nearest scroll container; null outside one. */
+const RevealScroll = createContext<SharedValue<number> | null>(null);
+/** The nearest revealing ancestor. Only the innermost reveal animates, so a group holding cards stays still while each card animates. */
+const RevealParent = createContext<{ register: () => () => void } | null>(null);
+/** How far (px) an element must poke into the screen before it reveals. */
+const REVEAL_THRESHOLD = 24;
+const REVEAL_DISTANCE = 18;
+const REVEAL_TIMING = { duration: 420, easing: Easing.out(Easing.cubic) };
+
+/**
+ * Fades and slides an element in every time it scrolls into view: up when it enters from the bottom, down when it
+ * enters from the top. It resets once fully off screen. Outside a scroll container it reveals once on mount.
+ */
+function useReveal(target: AnimatedRef<Animated.View>, index = 0) {
+  const scrollY = useContext(RevealScroll);
+  const parent = useContext(RevealParent);
+  const { height } = useSafeAreaFrame();
+  const progress = useSharedValue(0);
+  const direction = useSharedValue(1);
+  const shown = useSharedValue(false);
+  const everShown = useSharedValue(false);
+  const laidOut = useSharedValue(false);
+  const children = useSharedValue(0);
+  const firstDelay = Math.min(index, 10) * 60;
+
+  const [scope] = useState(() => ({
+    register: () => {
+      children.set(children.get() + 1);
+      return () => children.set(children.get() - 1);
+    },
+  }));
+  useEffect(() => parent?.register(), [parent]);
+
+  const check = () => {
+    'worklet';
+    if (!laidOut.get() || children.get() > 0) return;
+    let entering = !scrollY;
+    let leaving = false;
+    let fromBelow = true;
+    if (scrollY) {
+      const m = measure(target);
+      if (!m) return;
+      const top = m.pageY;
+      const bottom = m.pageY + m.height;
+      entering = top < height - REVEAL_THRESHOLD && bottom > REVEAL_THRESHOLD;
+      leaving = bottom <= 0 || top >= height;
+      fromBelow = top > height / 2;
+    }
+    if (!shown.get() && entering) {
+      shown.set(true);
+      const first = !everShown.get();
+      everShown.set(true);
+      direction.set(first || fromBelow ? 1 : -1);
+      progress.set(withDelay(first ? firstDelay : 0, withTiming(1, REVEAL_TIMING)));
+    } else if (shown.get() && leaving) {
+      shown.set(false);
+      progress.set(0);
+    }
+  };
+
+  useAnimatedReaction(
+    () => (scrollY ? scrollY.get() : 0),
+    () => check(),
+  );
+
+  const style = useAnimatedStyle(() => {
+    if (children.get() > 0) return { opacity: 1, transform: [{ translateY: 0 }] };
+    return {
+      opacity: progress.get(),
+      transform: [{ translateY: (1 - progress.get()) * REVEAL_DISTANCE * direction.get() }],
+    };
+  });
+
+  return {
+    style,
+    scope,
+    onLayout: () => {
+      scheduleOnUI(() => {
+        'worklet';
+        laidOut.set(true);
+        check();
+      });
+    },
+  };
+}
+
+/** Reveals children as they scroll into view; `index` staggers siblings on first paint. */
 export function Appear({ children, index = 0, style }: { children: ReactNode; index?: number; style?: StyleProp<ViewStyle> }) {
+  const target = useAnimatedRef<Animated.View>();
+  const reveal = useReveal(target, index);
   return (
-    <Animated.View entering={FadeInDown.duration(420).delay(Math.min(index, 10) * 60).springify().damping(18)} style={style}>
-      {children}
+    <Animated.View ref={target} onLayout={reveal.onLayout} style={[style, reveal.style]}>
+      <RevealParent.Provider value={reveal.scope}>{children}</RevealParent.Provider>
     </Animated.View>
+  );
+}
+
+/** Scopes reveals to a scroll container (UI-thread handler for Reanimated scroll views). */
+function useRevealScroll() {
+  const scrollY = useSharedValue(0);
+  const onScroll = useAnimatedScrollHandler((e) => {
+    scrollY.set(e.contentOffset.y);
+  });
+  return { scrollY, onScroll };
+}
+
+/** Scroll tracking for plain `FlatList`/`SectionList`: pass `onScroll` and `scrollEventThrottle` to the list and wrap it in `RevealScope`. */
+export function useRevealList() {
+  const scrollY = useSharedValue(0);
+  return {
+    scrollY,
+    scrollEventThrottle: 16,
+    onScroll: (e: NativeSyntheticEvent<NativeScrollEvent>) => scrollY.set(e.nativeEvent.contentOffset.y),
+  };
+}
+
+export function RevealScope({ scrollY, children }: { scrollY: SharedValue<number> | null; children: ReactNode }) {
+  return (
+    <RevealParent.Provider value={null}>
+      <RevealScroll.Provider value={scrollY}>{children}</RevealScroll.Provider>
+    </RevealParent.Provider>
   );
 }
 
@@ -170,17 +294,23 @@ export function Glass({
   blur,
   strong,
   rounded = radius.lg,
+  reveal,
+  revealTarget,
 }: {
   children?: ReactNode;
   style?: StyleProp<ViewStyle>;
   blur?: boolean;
   strong?: boolean;
   rounded?: number;
+  reveal?: ReturnType<typeof useReveal>;
+  revealTarget?: AnimatedRef<Animated.View>;
 }) {
   const { colors, dark } = useTheme();
   const realBlur = blur && Platform.OS === 'ios';
   return (
-    <View
+    <Animated.View
+      ref={revealTarget}
+      onLayout={reveal?.onLayout}
       style={[
         {
           borderRadius: rounded,
@@ -190,6 +320,7 @@ export function Glass({
           boxShadow: `0 10px 30px ${colors.shadow}`,
         },
         style,
+        reveal?.style,
       ]}>
       {realBlur ? (
         <BlurView
@@ -206,7 +337,7 @@ export function Glass({
         ]}
       />
       {children}
-    </View>
+    </Animated.View>
   );
 }
 
@@ -227,23 +358,29 @@ export function Screen({
   contentStyle?: StyleProp<ViewStyle>;
 }) {
   const inner = [padded && { padding: spacing.lg }, { gap: spacing.lg }, contentStyle];
+  const { scrollY, onScroll } = useRevealScroll();
   return (
     <View style={{ flex: 1 }}>
       <Backdrop />
       <SafeAreaView edges={edges} style={{ flex: 1 }}>
         {scroll ? (
-          <KeyboardAwareScrollView
-            bottomOffset={spacing.xl}
-            contentContainerStyle={[padded && { padding: spacing.lg }, { gap: spacing.lg, paddingBottom: 120 }, contentStyle]}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-            refreshControl={refreshControl}>
-            {children}
-          </KeyboardAwareScrollView>
+          <RevealScope scrollY={scrollY}>
+            <KeyboardAwareScrollView
+              bottomOffset={spacing.xl}
+              contentContainerStyle={[padded && { padding: spacing.lg }, { gap: spacing.lg, paddingBottom: 120 }, contentStyle]}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              refreshControl={refreshControl}
+              onScroll={onScroll}>
+              {children}
+            </KeyboardAwareScrollView>
+          </RevealScope>
         ) : (
-          <KeyboardAvoidingView behavior="padding" automaticOffset style={[{ flex: 1 }, inner]}>
-            {children}
-          </KeyboardAvoidingView>
+          <RevealScope scrollY={null}>
+            <KeyboardAvoidingView behavior="padding" automaticOffset style={[{ flex: 1 }, inner]}>
+              {children}
+            </KeyboardAvoidingView>
+          </RevealScope>
         )}
       </SafeAreaView>
     </View>
@@ -337,11 +474,14 @@ export function Card({
   blur?: boolean;
 }) {
   const press = usePressScale(0.98);
+  const target = useAnimatedRef<Animated.View>();
+  const reveal = useReveal(target);
   const base: ViewStyle = { padding: spacing.lg, gap: spacing.sm };
+  const content = <RevealParent.Provider value={reveal.scope}>{children}</RevealParent.Provider>;
   if (!onPress && !onLongPress) {
     return (
-      <Glass blur={blur} style={[base, style]}>
-        {children}
+      <Glass blur={blur} style={[base, style]} reveal={reveal} revealTarget={target}>
+        {content}
       </Glass>
     );
   }
@@ -353,8 +493,8 @@ export function Card({
       onPressIn={press.onPressIn}
       onPressOut={press.onPressOut}
       style={press.style}>
-      <Glass blur={blur} style={[base, style]}>
-        {children}
+      <Glass blur={blur} style={[base, style]} reveal={reveal} revealTarget={target}>
+        {content}
       </Glass>
     </AnimatedPressable>
   );
@@ -363,14 +503,16 @@ export function Card({
 export function Section({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
   return (
     <View style={{ gap: spacing.sm }}>
-      <Row style={{ paddingHorizontal: spacing.xs, minHeight: 28 }}>
-        <AppText variant="label" muted>
-          {title}
-        </AppText>
-        <Spacer />
-        {action}
-      </Row>
-      {children}
+      <Appear>
+        <Row style={{ paddingHorizontal: spacing.xs, minHeight: 28 }}>
+          <AppText variant="label" muted>
+            {title}
+          </AppText>
+          <Spacer />
+          {action}
+        </Row>
+      </Appear>
+      <Appear style={{ gap: spacing.sm }}>{children}</Appear>
     </View>
   );
 }
@@ -697,7 +839,7 @@ export function Segmented<T extends string>({
   const index = Math.max(0, options.findIndex((o) => o.value === value));
   const x = useSharedValue(0);
   useEffect(() => {
-    x.set(withSpring(index * segment, SPRING));
+    x.set(withTiming(index * segment, MOTION));
   }, [index, segment, x]);
   const indicator = useAnimatedStyle(() => ({ transform: [{ translateX: x.get() }] }));
 
@@ -1045,19 +1187,23 @@ export function Sheet({
   onClose: () => void;
   children: ReactNode;
 }) {
+  const { scrollY, onScroll } = useRevealScroll();
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <View style={{ flex: 1 }}>
         <Backdrop />
         <SafeAreaView style={{ flex: 1 }}>
           <SheetHeader title={title} icon={icon} onClose={onClose} />
-          <KeyboardAwareScrollView
-            bottomOffset={spacing.xl}
-            contentContainerStyle={{ flexGrow: 1, padding: spacing.lg, paddingTop: 0, gap: spacing.lg }}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}>
-            {children}
-          </KeyboardAwareScrollView>
+          <RevealScope scrollY={scrollY}>
+            <KeyboardAwareScrollView
+              bottomOffset={spacing.xl}
+              contentContainerStyle={{ flexGrow: 1, padding: spacing.lg, paddingTop: 0, gap: spacing.lg }}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              onScroll={onScroll}>
+              {children}
+            </KeyboardAwareScrollView>
+          </RevealScope>
         </SafeAreaView>
       </View>
     </Modal>

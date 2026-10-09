@@ -1,14 +1,30 @@
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Pressable, RefreshControl, SectionList, View } from 'react-native';
-import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { qk } from '@expense/api-client';
 import type { RoomSpendingItemDTO, TransactionType } from '@expense/shared';
 import { Money, RoomExpenseRow, TransactionRow } from '@/components/finance';
 import { SyncBanner } from '@/components/SyncBanner';
-import { AppText, Appear, Backdrop, Chip, EmptyState, Fab, Glass, Icon, IconButton, linearGradient, Row, SPRING, useTabBarInset } from '@/components/ui';
+import {
+  AppText,
+  Appear,
+  Backdrop,
+  Chip,
+  EmptyState,
+  Fab,
+  Glass,
+  Icon,
+  IconButton,
+  linearGradient,
+  MOTION,
+  RevealScope,
+  Row,
+  useRevealList,
+  useTabBarInset,
+} from '@/components/ui';
 import { useCategories, useLocalQuery, useSpendingSummary } from '@/hooks/data';
 import { api } from '@/lib/api';
 import { useUser } from '@/lib/auth';
@@ -38,12 +54,63 @@ const MONTH_ICON = [
 function CollapseChevron({ collapsed, color }: { collapsed: boolean; color: string }) {
   const progress = useSharedValue(collapsed ? 1 : 0);
   useEffect(() => {
-    progress.set(withSpring(collapsed ? 1 : 0, SPRING));
+    progress.set(withTiming(collapsed ? 1 : 0, MOTION));
   }, [collapsed, progress]);
   const style = useAnimatedStyle(() => ({ transform: [{ rotate: `${progress.get() * 180}deg` }] }));
   return (
     <Animated.View style={style}>
       <Icon name="chevron-up" size={20} color={color} />
+    </Animated.View>
+  );
+}
+
+/** Day header card; its bottom corners round off in step with the rows closing beneath it. */
+function DayHeaderShape({ collapsed, children }: { collapsed: boolean; children: ReactNode }) {
+  const { colors } = useTheme();
+  const progress = useSharedValue(collapsed ? 1 : 0);
+  useEffect(() => {
+    progress.set(withTiming(collapsed ? 1 : 0, MOTION));
+  }, [collapsed, progress]);
+  const corners = useAnimatedStyle(() => ({
+    borderBottomLeftRadius: radius.lg * progress.get(),
+    borderBottomRightRadius: radius.lg * progress.get(),
+  }));
+  return (
+    <Animated.View
+      style={[
+        {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: spacing.sm,
+          paddingHorizontal: spacing.md,
+          paddingVertical: spacing.sm + 2,
+          borderTopLeftRadius: radius.lg,
+          borderTopRightRadius: radius.lg,
+          backgroundColor: colors.glassStrong,
+          borderWidth: 1,
+          borderColor: colors.glassBorder,
+        },
+        corners,
+      ]}>
+      {children}
+    </Animated.View>
+  );
+}
+
+/** Animates its children's height and opacity between open and closed. */
+function Collapsible({ open, children }: { open: boolean; children: ReactNode }) {
+  const height = useSharedValue(0);
+  const progress = useSharedValue(open ? 1 : 0);
+  useEffect(() => {
+    progress.set(withTiming(open ? 1 : 0, MOTION));
+  }, [open, progress]);
+  const style = useAnimatedStyle(() => ({ height: height.get() * progress.get(), opacity: progress.get() }));
+  return (
+    <Animated.View style={[{ overflow: 'hidden' }, style]}>
+      {/* Absolutely positioned so the content keeps its natural height while the wrapper shrinks. */}
+      <View style={{ position: 'absolute', top: 0, left: 0, right: 0 }} onLayout={(e) => height.set(e.nativeEvent.layout.height)}>
+        {children}
+      </View>
     </Animated.View>
   );
 }
@@ -118,6 +185,7 @@ export default function Transactions() {
   const user = useUser();
   const { colors } = useTheme();
   const tabInset = useTabBarInset();
+  const reveal = useRevealList();
   const { byId } = useCategories();
   const [type, setType] = useState<TransactionType | undefined>();
   const [limit, setLimit] = useState(PAGE);
@@ -153,9 +221,9 @@ export default function Transactions() {
       key,
       title: formatDay(key),
       total: data.reduce((s, i) => s + (i.kind === 'room' ? i.room.share : i.tx.type === 'expense' ? i.tx.amount : 0), 0),
-      data: collapsed.has(key) ? [] : data,
+      data,
     }));
-  }, [items, roomItems.data, type, collapsed]);
+  }, [items, roomItems.data, type]);
 
   const toggleDay = (key: string) =>
     setCollapsed((prev) => {
@@ -201,86 +269,82 @@ export default function Transactions() {
           </Appear>
           <SyncBanner />
         </View>
-        <SectionList
-          sections={sections}
-          keyExtractor={(i) => i.key}
-          contentContainerStyle={{ flexGrow: 1, paddingHorizontal: spacing.lg, paddingBottom: tabInset + 80 }}
-          showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />}
-          stickySectionHeadersEnabled={false}
-          onEndReached={() => {
-            if ((items?.length ?? 0) >= limit) setLimit((l) => l + PAGE);
-          }}
-          renderSectionHeader={({ section }) => {
-            const isCollapsed = collapsed.has(section.key);
-            return (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityState={{ expanded: !isCollapsed }}
-                accessibilityLabel={`${section.title}, ${isCollapsed ? 'expand' : 'collapse'}`}
-                onPress={() => toggleDay(section.key)}
-                style={({ pressed }) => ({
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: spacing.sm,
-                  marginTop: spacing.md,
-                  paddingHorizontal: spacing.md,
-                  paddingVertical: spacing.sm + 2,
-                  borderTopLeftRadius: radius.lg,
-                  borderTopRightRadius: radius.lg,
-                  borderBottomLeftRadius: isCollapsed ? radius.lg : 0,
-                  borderBottomRightRadius: isCollapsed ? radius.lg : 0,
-                  backgroundColor: colors.glassStrong,
-                  borderWidth: 1,
-                  borderColor: colors.glassBorder,
-                  opacity: pressed ? 0.7 : 1,
-                })}>
-                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.primary }} />
-                <AppText variant="label" style={{ flex: 1 }}>
-                  {section.title}
-                </AppText>
-                {section.total > 0 ? <Money amount={section.total} currency={user.defaultCurrency} variant="body" type="expense" /> : null}
-                <CollapseChevron collapsed={isCollapsed} color={colors.textMuted} />
-              </Pressable>
-            );
-          }}
-          renderItem={({ item, index, section }) => {
-            const last = index === section.data.length - 1;
-            return (
-              <View
-                style={{
-                  paddingHorizontal: spacing.md,
-                  backgroundColor: colors.glass,
-                  borderLeftWidth: 1,
-                  borderRightWidth: 1,
-                  borderBottomWidth: last ? 1 : 0,
-                  borderColor: colors.glassBorder,
-                  borderBottomLeftRadius: last ? radius.lg : 0,
-                  borderBottomRightRadius: last ? radius.lg : 0,
-                }}>
-                {item.kind === 'room' ? (
-                  <RoomExpenseRow
-                    item={item.room}
-                    currency={user.defaultCurrency}
-                    category={item.room.categoryId ? byId.get(item.room.categoryId) : undefined}
-                    onPress={() => router.push({ pathname: '/room/[id]/expense-detail', params: { id: item.room.roomId, expenseId: item.room.expenseId } })}
-                  />
-                ) : (
-                  <TransactionRow
-                    tx={item.tx}
-                    category={byId.get(item.tx.categoryId)}
-                    onPress={() => router.push({ pathname: '/transaction/view/[id]', params: { id: item.tx.clientId } })}
-                  />
-                )}
+        <RevealScope scrollY={reveal.scrollY}>
+          <SectionList
+            sections={sections}
+            keyExtractor={(i) => i.key}
+            contentContainerStyle={{ flexGrow: 1, paddingHorizontal: spacing.lg, paddingBottom: tabInset + 80 }}
+            showsVerticalScrollIndicator={false}
+            onScroll={reveal.onScroll}
+            scrollEventThrottle={reveal.scrollEventThrottle}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />}
+            stickySectionHeadersEnabled={false}
+            extraData={collapsed}
+            onEndReached={() => {
+              if ((items?.length ?? 0) >= limit) setLimit((l) => l + PAGE);
+            }}
+            renderSectionHeader={({ section }) => {
+              const isCollapsed = collapsed.has(section.key);
+              return (
+                <Appear>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityState={{ expanded: !isCollapsed }}
+                    accessibilityLabel={`${section.title}, ${isCollapsed ? 'expand' : 'collapse'}`}
+                    onPress={() => toggleDay(section.key)}
+                    style={({ pressed }) => ({ marginTop: spacing.md, opacity: pressed ? 0.7 : 1 })}>
+                    <DayHeaderShape collapsed={isCollapsed}>
+                      <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.primary }} />
+                      <AppText variant="label" style={{ flex: 1 }}>
+                        {section.title}
+                      </AppText>
+                      {section.total > 0 ? <Money amount={section.total} currency={user.defaultCurrency} variant="body" type="expense" /> : null}
+                      <CollapseChevron collapsed={isCollapsed} color={colors.textMuted} />
+                    </DayHeaderShape>
+                  </Pressable>
+                </Appear>
+              );
+            }}
+            renderItem={({ item, index, section }) => {
+              const last = index === section.data.length - 1;
+              return (
+                <Collapsible open={!collapsed.has(section.key)}>
+                  <Appear
+                    style={{
+                      paddingHorizontal: spacing.md,
+                      backgroundColor: colors.glass,
+                      borderLeftWidth: 1,
+                      borderRightWidth: 1,
+                      borderBottomWidth: last ? 1 : 0,
+                      borderColor: colors.glassBorder,
+                      borderBottomLeftRadius: last ? radius.lg : 0,
+                      borderBottomRightRadius: last ? radius.lg : 0,
+                    }}>
+                    {item.kind === 'room' ? (
+                      <RoomExpenseRow
+                        item={item.room}
+                        currency={user.defaultCurrency}
+                        category={item.room.categoryId ? byId.get(item.room.categoryId) : undefined}
+                        onPress={() => router.push({ pathname: '/room/[id]/expense-detail', params: { id: item.room.roomId, expenseId: item.room.expenseId } })}
+                      />
+                    ) : (
+                      <TransactionRow
+                        tx={item.tx}
+                        category={byId.get(item.tx.categoryId)}
+                        onPress={() => router.push({ pathname: '/transaction/view/[id]', params: { id: item.tx.clientId } })}
+                      />
+                    )}
+                  </Appear>
+                </Collapsible>
+              );
+            }}
+            ListEmptyComponent={
+              <View style={{ flex: 1, justifyContent: 'center' }}>
+                <EmptyState icon="text-box-search-outline" title={type ? 'No matches' : 'Nothing this month'} />
               </View>
-            );
-          }}
-          ListEmptyComponent={
-            <View style={{ flex: 1, justifyContent: 'center' }}>
-              <EmptyState icon="text-box-search-outline" title={type ? 'No matches' : 'Nothing this month'} />
-            </View>
-          }
-        />
+            }
+          />
+        </RevealScope>
         <Fab label="Add transaction" onPress={() => router.push({ pathname: '/transaction/[id]', params: { id: 'new' } })} />
       </SafeAreaView>
     </View>

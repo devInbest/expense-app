@@ -23,8 +23,10 @@ import {
   linearGradient,
   Loading,
   ProgressBar,
+  RevealScope,
   Row,
   Segmented,
+  useRevealList,
 } from '@/components/ui';
 import { useCategories } from '@/hooks/data';
 import { useRoom } from '@/hooks/rooms';
@@ -40,6 +42,7 @@ export default function RoomScreen() {
   const r = useRoom(id);
   const [tab, setTab] = useState<Tab>('expenses');
   const insets = useSafeAreaInsets();
+  const reveal = useRevealList();
   const isSplit = r.room?.type === 'split';
 
   const expenses = useInfiniteQuery({
@@ -179,45 +182,51 @@ export default function RoomScreen() {
           ),
         }}
       />
-      {tab === 'expenses' ? (
-        <FlatList
-          data={items}
-          keyExtractor={(e) => e._id}
-          contentContainerStyle={{ padding: spacing.lg, paddingBottom: listBottom }}
-          showsVerticalScrollIndicator={false}
-          ListHeaderComponent={header}
-          refreshControl={<RefreshControl refreshing={expenses.isRefetching} onRefresh={refresh} tintColor={colors.primary} colors={[colors.primary]} />}
-          onEndReached={() => expenses.hasNextPage && void expenses.fetchNextPage()}
-          ListEmptyComponent={expenses.isLoading ? <Loading /> : <EmptyState icon="receipt" title="No expenses yet" message="Add the first one with the + button." />}
-          renderItem={({ item, index }) => (
-            <Appear index={index}>
-              <ExpenseRow
-                expense={item}
-                me={r.me}
-                name={r.name}
-                isSplit={isSplit}
-                currency={room.currency}
-                category={item.categoryId ? byId.get(item.categoryId) : undefined}
-                onPress={() => router.push({ pathname: '/room/[id]/expense-detail', params: { id, expenseId: item._id } })}
-              />
-            </Appear>
-          )}
-        />
-      ) : (
-        <FlatList
-          data={[]}
-          renderItem={null}
-          contentContainerStyle={{ padding: spacing.lg, paddingBottom: listBottom }}
-          showsVerticalScrollIndicator={false}
-          ListHeaderComponent={
-            <>
-              {header}
-              {isSplit ? <BalancesView roomId={id} name={r.name} avatar={r.avatar} me={r.me} currency={room.currency} /> : <SummaryView roomId={id} name={r.name} avatar={r.avatar} currency={room.currency} />}
-            </>
-          }
-          refreshControl={<RefreshControl refreshing={false} onRefresh={refresh} tintColor={colors.primary} colors={[colors.primary]} />}
-        />
-      )}
+      <RevealScope scrollY={reveal.scrollY}>
+        {tab === 'expenses' ? (
+          <FlatList
+            data={items}
+            keyExtractor={(e) => e._id}
+            contentContainerStyle={{ padding: spacing.lg, paddingBottom: listBottom }}
+            showsVerticalScrollIndicator={false}
+            onScroll={reveal.onScroll}
+            scrollEventThrottle={reveal.scrollEventThrottle}
+            ListHeaderComponent={header}
+            refreshControl={<RefreshControl refreshing={expenses.isRefetching} onRefresh={refresh} tintColor={colors.primary} colors={[colors.primary]} />}
+            onEndReached={() => expenses.hasNextPage && void expenses.fetchNextPage()}
+            ListEmptyComponent={expenses.isLoading ? <Loading /> : <EmptyState icon="receipt" title="No expenses yet" message="Add the first one with the + button." />}
+            renderItem={({ item, index }) => (
+              <Appear index={index}>
+                <ExpenseRow
+                  expense={item}
+                  me={r.me}
+                  name={r.name}
+                  isSplit={isSplit}
+                  currency={room.currency}
+                  category={item.categoryId ? byId.get(item.categoryId) : undefined}
+                  onPress={() => router.push({ pathname: '/room/[id]/expense-detail', params: { id, expenseId: item._id } })}
+                />
+              </Appear>
+            )}
+          />
+        ) : (
+          <FlatList
+            data={[]}
+            renderItem={null}
+            contentContainerStyle={{ padding: spacing.lg, paddingBottom: listBottom }}
+            showsVerticalScrollIndicator={false}
+            onScroll={reveal.onScroll}
+            scrollEventThrottle={reveal.scrollEventThrottle}
+            ListHeaderComponent={
+              <>
+                {header}
+                {isSplit ? <BalancesView roomId={id} name={r.name} avatar={r.avatar} me={r.me} currency={room.currency} /> : <SummaryView roomId={id} name={r.name} avatar={r.avatar} currency={room.currency} />}
+              </>
+            }
+            refreshControl={<RefreshControl refreshing={false} onRefresh={refresh} tintColor={colors.primary} colors={[colors.primary]} />}
+          />
+        )}
+      </RevealScope>
       {r.canAddExpense ? <Fab label="Add expense" safeBottom onPress={() => router.push({ pathname: '/room/[id]/expense', params: { id } })} /> : null}
     </View>
   );
