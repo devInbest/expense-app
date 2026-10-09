@@ -158,11 +158,19 @@ export default function RoomExpenseForm() {
   const allIncluded = people.every((uid) => included.has(uid));
 
   const valueSum = splitInputs.reduce((s, i) => s + (i.value ?? 0), 0);
-  const sumLabel =
-    splitType === 'exact'
-      ? `${formatMoney(valueSum, currency)} of ${formatMoney(total, currency)}`
-      : splitType === 'percent'
-        ? `${valueSum}% of 100%`
+  const remainingPct = Math.round((100 - valueSum) * 100) / 100;
+  const remainingAmount = total - valueSum;
+  const hasSplitValues = Object.values(values).some((v) => v !== '');
+  const sumLabel = !hasSplitValues
+    ? null
+    : splitType === 'exact' && remainingAmount !== 0
+      ? remainingAmount > 0
+        ? `${formatMoney(remainingAmount, currency)} remaining`
+        : `${formatMoney(-remainingAmount, currency)} over the total`
+      : splitType === 'percent' && remainingPct !== 0
+        ? remainingPct > 0
+          ? `${remainingPct}% remaining`
+          : `${-remainingPct}% over 100%`
         : null;
   const equalEach = splitType === 'equal' && preview.splits?.length ? preview.splits[0].amount : null;
 
@@ -218,7 +226,15 @@ export default function RoomExpenseForm() {
           </Section>
 
           <Section title="Split type">
-            <Segmented options={splitOptions} value={splitType} onChange={setSplitType} />
+            <Segmented
+              options={splitOptions}
+              value={splitType}
+              onChange={(t) => {
+                setSplitType(t);
+                setValues({});
+                setError(null);
+              }}
+            />
             {splitInputs.length ? (
               <Card>
                 {splitType === 'equal' ? (
@@ -229,7 +245,9 @@ export default function RoomExpenseForm() {
                   </AppText>
                 ) : (
                   splitInputs.map(({ userId: uid }) => {
-                    const share = preview.splits?.find((s) => s.userId === uid)?.amount;
+                    const share =
+                      preview.splits?.find((s) => s.userId === uid)?.amount ??
+                      (splitType === 'percent' && total > 0 ? Math.round((total * Number(values[uid] || 0)) / 100) : undefined);
                     return (
                       <Row key={uid} style={{ paddingVertical: 4 }}>
                         <Avatar {...r.avatar(uid)} size={28} />
@@ -238,7 +256,10 @@ export default function RoomExpenseForm() {
                         </AppText>
                         <MoneyCell
                           value={values[uid] ?? ''}
-                          onChange={(v) => setValues((s) => ({ ...s, [uid]: v }))}
+                          onChange={(v) => {
+                            setValues((s) => ({ ...s, [uid]: v }));
+                            setError(null);
+                          }}
                           suffix={splitType === 'percent' ? '%' : splitType === 'shares' ? '×' : undefined}
                         />
                         {splitType !== 'exact' ? (
@@ -255,7 +276,7 @@ export default function RoomExpenseForm() {
                     {sumLabel}
                   </AppText>
                 ) : null}
-                {preview.error && total > 0 ? (
+                {preview.error && total > 0 && hasSplitValues ? (
                   <AppText variant="caption" color={colors.danger}>
                     {preview.error}
                   </AppText>
@@ -268,7 +289,7 @@ export default function RoomExpenseForm() {
 
       <DateField label="Date" value={date} onChange={setDate} />
 
-      <ErrorText>{error}</ErrorText>
+      <ErrorText>{error === preview.error && hasSplitValues ? null : error}</ErrorText>
       <View style={{ gap: spacing.sm }}>
         <Button title={existing ? 'Save changes' : 'Add expense'} onPress={() => save.mutate()} loading={save.isPending} />
         {existing && !hasPaidShares ? (
@@ -352,14 +373,14 @@ function PeoplePicker({
 }
 
 function MoneyCell({ value, onChange, suffix }: { value: string; onChange: (v: string) => void; suffix?: string }) {
-  const { colors } = useTheme();
+  const { colors, dark } = useTheme();
   return (
     <View
       style={{
         flexDirection: 'row',
         alignItems: 'center',
         borderWidth: 1.5,
-        borderColor: colors.glassBorder,
+        borderColor: dark ? colors.glassBorder : colors.textSubtle,
         backgroundColor: colors.glass,
         borderRadius: radius.sm,
         paddingHorizontal: spacing.sm,

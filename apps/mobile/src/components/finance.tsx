@@ -57,13 +57,13 @@ export function AmountInput({ value, onChange, currency, autoFocus }: { value: s
       <TextInput
         value={value}
         onChangeText={(t) => onChange(sanitize(t))}
-        placeholder="0"
+        placeholder="Enter Amount"
         placeholderTextColor={colors.textSubtle}
         selectionColor={colors.primary}
         cursorColor={colors.primary}
         keyboardType="decimal-pad"
         autoFocus={autoFocus}
-        style={{ fontSize: 52, fontWeight: '800', letterSpacing: -1, color: colors.text, minWidth: 80, textAlign: 'center' }}
+        style={{ fontSize: 36, fontWeight: '800', letterSpacing: -1, color: colors.text, minWidth: 80, textAlign: 'center', padding: 0 }}
       />
     </Row>
   );

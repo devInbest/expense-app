@@ -66,7 +66,7 @@ export const splitExact = (total: number, inputs: SplitInput[]): SplitResult[] =
   });
   const sum = results.reduce((a, r) => a + r.amount, 0);
   if (sum !== total) {
-    throw new SplitError(`Exact amounts add up to ${sum}, but the expense total is ${total}`);
+    throw new SplitError('Exact amounts must add up to the total amount');
   }
   return results;
 };
@@ -77,7 +77,7 @@ export const splitPercent = (total: number, inputs: SplitInput[]): SplitResult[]
   if (basisPoints.some((bp) => bp < 0)) throw new SplitError('Percentages cannot be negative');
   const sum = basisPoints.reduce((a, b) => a + b, 0);
   if (sum !== 10000) {
-    throw new SplitError(`Percentages add up to ${sum / 100}%, they must add up to 100%`);
+    throw new SplitError('Percentage must add up to 100%');
   }
   const amounts = allocate(total, basisPoints);
   return inputs.map((i, idx) => ({ userId: i.userId, share: basisPoints[idx] / 100, amount: amounts[idx] }));

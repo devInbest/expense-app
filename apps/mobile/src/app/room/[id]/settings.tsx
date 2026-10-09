@@ -135,23 +135,21 @@ export default function RoomSettingsScreen() {
 
       {r.role === 'owner' ? (
         <Section title="More">
-          <Card>
-            <Button
-              title={r.archived ? 'Restore room' : 'Archive room'}
-              icon="archive-outline"
-              variant="warning"
-              loading={archive.isPending}
-              onPress={() =>
-                r.archived
-                  ? archive.mutate(false)
-                  : Alert.alert('Archive room?', 'It becomes read-only for everyone. You can restore it later.', [
-                      { text: 'Cancel', style: 'cancel' },
-                      { text: 'Archive', style: 'destructive', onPress: () => archive.mutate(true) },
-                    ])
-              }
-            />
-            {r.archived ? <Button title="Delete room" variant="danger" loading={remove.isPending} onPress={() => void confirmDelete()} /> : null}
-          </Card>
+          <Button
+            title={r.archived ? 'Restore room' : 'Archive room'}
+            icon="archive-outline"
+            variant="warning"
+            loading={archive.isPending}
+            onPress={() =>
+              r.archived
+                ? archive.mutate(false)
+                : Alert.alert('Archive room?', 'It becomes read-only for everyone. You can restore it later.', [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Archive', style: 'destructive', onPress: () => archive.mutate(true) },
+                  ])
+            }
+          />
+          {r.archived ? <Button title="Delete room" variant="danger" loading={remove.isPending} onPress={() => void confirmDelete()} /> : null}
         </Section>
       ) : null}
       <AppText variant="caption" muted style={{ textAlign: 'center' }}>

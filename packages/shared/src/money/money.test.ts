@@ -47,7 +47,7 @@ describe('computeSplits', () => {
         { userId: 'a', value: 500 },
         { userId: 'b', value: 400 },
       ]),
-    ).toThrow(/add up to 900/);
+    ).toThrow(/must add up to the total/);
     const ok = computeSplits('exact', 1000, [
       { userId: 'a', value: 600 },
       { userId: 'b', value: 400 },

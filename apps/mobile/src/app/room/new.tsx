@@ -15,13 +15,13 @@ const TYPES: { value: RoomType; title: string; description: string; icon: string
   {
     value: 'split',
     title: 'Split expenses',
-    description: 'Trips, flatmates, dinners. Track who paid and who owes whom, then settle up.',
+    description: 'Track who owes whom and settle up.',
     icon: 'call-split',
   },
   {
     value: 'shared_budget',
     title: 'Shared budget',
-    description: 'Family or couple spending from one pot. Track the total against a budget, no IOUs.',
+    description: 'Spend from one pot against a budget.',
     icon: 'piggy-bank-outline',
   },
 ];
@@ -88,7 +88,15 @@ export default function NewRoom() {
 
   return (
     <Screen edges={['bottom']} contentStyle={{ paddingBottom: spacing.lg }}>
-      <Field label="Room name" value={name} onChangeText={setName} placeholder="e.g. Goa trip, Flat 302" maxLength={60} autoFocus />
+      <Field
+        label="Room name"
+        value={name}
+        onChangeText={setName}
+        placeholder=" e.g. Goa trip, Flat 302"
+        maxLength={24}
+        autoFocus
+        style={{ paddingHorizontal: 16, paddingVertical: 18 }}
+      />
       <Section title="Type">
         {TYPES.map((t) => {
           const selected = t.value === type;

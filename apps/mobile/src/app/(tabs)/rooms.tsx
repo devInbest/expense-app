@@ -243,7 +243,16 @@ function JoinSheet({ onClose }: { onClose: () => void }) {
   };
   return (
     <Sheet visible title="Join a room" onClose={onClose}>
-      <Field label="Invite code or link" value={code} onChangeText={setCode} autoCapitalize="characters" autoCorrect={false} autoFocus placeholder="e.g. K7Q2M9XD" />
+      <Field
+        label="Invite code or link"
+        value={code}
+        onChangeText={setCode}
+        autoCapitalize="characters"
+        autoCorrect={false}
+        autoFocus
+        placeholder=" e.g. K7Q2M9XD"
+        style={{ paddingHorizontal: 16, paddingVertical: 18 }}
+      />
       <Button title="Continue" icon="arrow-right" onPress={submit} />
     </Sheet>
   );

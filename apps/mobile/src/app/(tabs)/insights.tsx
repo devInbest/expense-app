@@ -201,12 +201,7 @@ export default function Insights() {
     <View style={{ flex: 1 }}>
       <Screen contentStyle={{ flexGrow: 1, paddingBottom: tabInset + spacing.lg }}>
         <Appear style={{ gap: spacing.lg }}>
-          <View>
-            <AppText variant="title">Insights</AppText>
-            <AppText variant="caption" muted>
-              Where your money goes
-            </AppText>
-          </View>
+          <AppText variant="title">Insights</AppText>
           <Segmented
             options={[
               { value: 'expense', label: 'Spending' },

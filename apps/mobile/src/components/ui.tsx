@@ -7,7 +7,6 @@ import {
   Modal,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Switch,
   Text,
@@ -21,6 +20,7 @@ import {
   type TextStyle,
   type ViewStyle,
 } from 'react-native';
+import { KeyboardAvoidingView, KeyboardAwareScrollView, KeyboardStickyView } from 'react-native-keyboard-controller';
 import Animated, {
   Easing,
   FadeIn,
@@ -232,15 +232,18 @@ export function Screen({
       <Backdrop />
       <SafeAreaView edges={edges} style={{ flex: 1 }}>
         {scroll ? (
-          <ScrollView
+          <KeyboardAwareScrollView
+            bottomOffset={spacing.xl}
             contentContainerStyle={[padded && { padding: spacing.lg }, { gap: spacing.lg, paddingBottom: 120 }, contentStyle]}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
             refreshControl={refreshControl}>
             {children}
-          </ScrollView>
+          </KeyboardAwareScrollView>
         ) : (
-          <View style={[{ flex: 1 }, inner]}>{children}</View>
+          <KeyboardAvoidingView behavior="padding" automaticOffset style={[{ flex: 1 }, inner]}>
+            {children}
+          </KeyboardAvoidingView>
         )}
       </SafeAreaView>
     </View>
@@ -250,26 +253,29 @@ export function Screen({
 /** Frosted action bar pinned to the bottom of a stack screen. */
 export function BottomBar({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   return (
-    <SafeAreaView
-      edges={['bottom']}
-      style={[
-        {
-          paddingHorizontal: spacing.lg,
-          paddingTop: spacing.md,
-          paddingBottom: spacing.sm,
-          gap: spacing.sm,
-          backgroundColor: colors.glassStrong,
-          borderTopWidth: 1,
-          borderColor: colors.glassBorder,
-          borderTopLeftRadius: radius.xl,
-          borderTopRightRadius: radius.xl,
-          boxShadow: `0 -8px 24px ${colors.shadow}`,
-        },
-        style,
-      ]}>
-      {children}
-    </SafeAreaView>
+    <KeyboardStickyView offset={{ opened: insets.bottom }}>
+      <SafeAreaView
+        edges={['bottom']}
+        style={[
+          {
+            paddingHorizontal: spacing.lg,
+            paddingTop: spacing.md,
+            paddingBottom: spacing.sm,
+            gap: spacing.sm,
+            backgroundColor: colors.glassStrong,
+            borderTopWidth: 1,
+            borderColor: colors.glassBorder,
+            borderTopLeftRadius: radius.xl,
+            borderTopRightRadius: radius.xl,
+            boxShadow: `0 -8px 24px ${colors.shadow}`,
+          },
+          style,
+        ]}>
+        {children}
+      </SafeAreaView>
+    </KeyboardStickyView>
   );
 }
 
@@ -1045,12 +1051,13 @@ export function Sheet({
         <Backdrop />
         <SafeAreaView style={{ flex: 1 }}>
           <SheetHeader title={title} icon={icon} onClose={onClose} />
-          <ScrollView
+          <KeyboardAwareScrollView
+            bottomOffset={spacing.xl}
             contentContainerStyle={{ flexGrow: 1, padding: spacing.lg, paddingTop: 0, gap: spacing.lg }}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}>
             {children}
-          </ScrollView>
+          </KeyboardAwareScrollView>
         </SafeAreaView>
       </View>
     </Modal>
