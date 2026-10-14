@@ -27,6 +27,11 @@
         "APP_VARIANT": "production",
         "EXPO_PUBLIC_API_URL": "https://expense-api-uwo5.onrender.com/api/v1"
       }
+    },
+    "production-apk": {
+      "extends": "production",
+      "distribution": "internal",
+      "android": { "buildType": "apk" }
     }
   },
   "submit": {
