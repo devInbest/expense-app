@@ -3,7 +3,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Alert, View } from 'react-native';
 import { ApiClientError, qk } from '@expense/api-client';
 import type { RoomMemberDTO } from '@expense/shared';
-import { AppText, BottomBar, Avatar, Button, Card, Divider, ErrorState, ListItem, Loading, Row, Screen, Section } from '@/components/ui';
+import { AppText, Avatar, Button, Card, Divider, ErrorState, ListItem, Loading, Row, Screen, Section } from '@/components/ui';
 import { useRoom } from '@/hooks/rooms';
 import { api, errorMessage, showError } from '@/lib/api';
 import { timeAgo } from '@/lib/dates';
@@ -118,7 +118,7 @@ export default function Members() {
 
   return (
     <View style={{ flex: 1 }}>
-      <Screen edges={[]} contentStyle={{ paddingBottom: spacing.lg }}>
+      <Screen edges={['bottom']} contentStyle={{ paddingBottom: spacing.lg }}>
         <Section title={`Members (${r.active.length})`}>
           <Card>
             {r.active.map((m, i) => (
@@ -172,36 +172,37 @@ export default function Members() {
             </Card>
           </Section>
         ) : null}
-      </Screen>
-      <BottomBar>
-        <Row>
-          {r.canInvite ? (
+
+        {r.archived ? null : (
+          <Row>
+            {r.canInvite ? (
+              <Button
+                title="Invite people"
+                icon="account-plus-outline"
+                style={{ flex: 1 }}
+                onPress={() => router.push({ pathname: '/room/[id]/invite', params: { id } })}
+              />
+            ) : null}
             <Button
-              title="Invite people"
-              icon="account-plus-outline"
+              title="Leave room"
+              icon="logout"
+              variant="danger"
               style={{ flex: 1 }}
-              onPress={() => router.push({ pathname: '/room/[id]/invite', params: { id } })}
+              loading={leave.isPending}
+              onPress={() =>
+                Alert.alert('Leave this room?', "You'll lose access to its expenses.", [
+                  { text: 'Cancel', style: 'cancel' },
+                  {
+                    text: 'Leave',
+                    style: 'destructive',
+                    onPress: () => leave.mutate(),
+                  },
+                ])
+              }
             />
-          ) : null}
-          <Button
-            title="Leave room"
-            icon="logout"
-            variant="danger"
-            style={{ flex: 1 }}
-            loading={leave.isPending}
-            onPress={() =>
-              Alert.alert('Leave this room?', "You'll lose access to its expenses.", [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                  text: 'Leave',
-                  style: 'destructive',
-                  onPress: () => leave.mutate(),
-                },
-              ])
-            }
-          />
-        </Row>
-      </BottomBar>
+          </Row>
+        )}
+      </Screen>
     </View>
   );
 }

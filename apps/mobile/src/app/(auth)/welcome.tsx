@@ -1,48 +1,21 @@
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { View } from 'react-native';
-import Animated, { FadeInDown, FadeInUp, useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
-import { AppText, Button, Glass, Icon, linearGradient, MOTION, Row, Screen } from '@/components/ui';
+import { useState } from 'react';
+import { Image } from 'expo-image';
+import { StatusBar } from 'expo-status-bar';
+import { Pressable, StyleSheet, View } from 'react-native';
+import Animated, { FadeIn, FadeInDown, FadeInUp } from 'react-native-reanimated';
+import { AppText, Button, Glass, Icon, MOTION, Screen } from '@/components/ui';
 import { api, showError } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { getGoogleIdToken, isGoogleConfigured } from '@/lib/google';
 import { getDeviceInfo } from '@/lib/secure';
 import { spacing, useTheme } from '@/theme';
 
-const FEATURES = [
-  { icon: 'chart-arc', label: 'Insights' },
-  { icon: 'target', label: 'Budgets' },
-  { icon: 'account-group', label: 'Split bills' },
-];
-
-function FloatingChip({ icon, label, index }: { icon: string; label: string; index: number }) {
-  const { colors } = useTheme();
-  const y = useSharedValue(0);
-  useEffect(() => {
-    y.set(withRepeat(withSequence(withTiming(-5, { duration: 1400 + index * 300 }), withTiming(0, { duration: 1400 + index * 300 })), -1));
-  }, [y, index]);
-  const style = useAnimatedStyle(() => ({ transform: [{ translateY: y.get() }] }));
-  return (
-    <Animated.View entering={FadeInUp.delay(400 + index * 120).duration(450).easing(MOTION.easing)} style={style}>
-      <Glass rounded={999} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: spacing.md, paddingVertical: 8 }}>
-        <Icon name={icon} size={16} color={colors.primary} />
-        <AppText variant="caption" style={{ fontWeight: '700' }}>
-          {label}
-        </AppText>
-      </Glass>
-    </Animated.View>
-  );
-}
-
 export default function Welcome() {
   const { colors } = useTheme();
   const { signIn } = useAuth();
   const [googleLoading, setGoogleLoading] = useState(false);
-  const pulse = useSharedValue(1);
-  useEffect(() => {
-    pulse.set(withRepeat(withSequence(withTiming(1.06, { duration: 1500 }), withTiming(1, { duration: 1500 })), -1));
-  }, [pulse]);
-  const logo = useAnimatedStyle(() => ({ transform: [{ scale: pulse.get() }] }));
+  const [accepted, setAccepted] = useState(true);
 
   const continueWithGoogle = async () => {
     setGoogleLoading(true);
@@ -58,51 +31,53 @@ export default function Welcome() {
   };
 
   return (
-    <Screen scroll={false} edges={['top', 'bottom']}>
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', gap: spacing.xl }}>
-        <Animated.View entering={FadeInDown.duration(600).easing(MOTION.easing)} style={logo}>
-          <View
-            style={{
-              width: 112,
-              height: 112,
-              borderRadius: 36,
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: colors.primary,
-              experimental_backgroundImage: linearGradient('#FF7A45', colors.primaryDeep),
-              boxShadow: `0 20px 50px ${colors.primaryGlow}`,
-              borderWidth: 1.5,
-              borderColor: 'rgba(255,255,255,0.4)',
-            }}>
-            <Icon name="wallet" size={56} color={colors.onPrimary} />
-          </View>
-        </Animated.View>
+    <Screen scroll={false} padded={false} edges={['bottom']} contentStyle={{ gap: 0 }}>
+      <StatusBar style="dark" />
+      <Animated.View entering={FadeIn.duration(600)} style={{ flex: 1, overflow: 'hidden', backgroundColor: '#FCBE98' }}>
+        <Image source={require('../../../assets/images/onboarding-hero.jpg')} contentFit="cover" style={[StyleSheet.absoluteFill, { top: 24, bottom: -24 }]} />
+        <View
+          style={{
+            position: 'absolute',
+            left: '-25%',
+            right: '-25%',
+            bottom: -72,
+            height: 96,
+            backgroundColor: colors.background,
+            transform: [{ rotate: '-6deg' }],
+          }}
+        />
+      </Animated.View>
 
-        <Animated.View entering={FadeInDown.delay(150).duration(500)} style={{ alignItems: 'center', gap: spacing.sm }}>
-          <AppText variant="display">
-            expense<AppText variant="display" color={colors.primary}>Hog</AppText>
-          </AppText>
-          <AppText muted style={{ textAlign: 'center', maxWidth: 300, lineHeight: 22 }}>
-            Track your daily spending, set budgets, and split shared costs with friends and family.
-          </AppText>
-        </Animated.View>
+      <Animated.View entering={FadeInDown.delay(150).duration(500)} style={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.lg }}>
+        <AppText variant="title" color={colors.primary} style={{ textAlign: 'center' }}>
+          Spend Smarter{'\n'}Save More
+        </AppText>
+      </Animated.View>
 
-        <Row gap={spacing.sm} style={{ flexWrap: 'wrap', justifyContent: 'center' }}>
-          {FEATURES.map((f, i) => (
-            <FloatingChip key={f.label} icon={f.icon} label={f.label} index={i} />
-          ))}
-        </Row>
-      </View>
-
-      <Animated.View entering={FadeInUp.delay(300).duration(500).easing(MOTION.easing)}>
+      <Animated.View entering={FadeInUp.delay(300).duration(500).easing(MOTION.easing)} style={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.lg }}>
         <Glass blur style={{ padding: spacing.lg, gap: spacing.md }} rounded={30}>
-          <Button title="Continue with phone" icon="cellphone" onPress={() => router.push('/phone')} />
+          <Button title="Continue with phone" icon="cellphone" disabled={!accepted} onPress={() => router.push('/phone')} />
           {isGoogleConfigured() ? (
-            <Button title="Continue with Google" icon="google" variant="glass" loading={googleLoading} onPress={continueWithGoogle} />
+            <Button
+              title="Continue with Google"
+              icon={<Image source={require('../../../assets/images/google-g.png')} style={{ width: 20, height: 20 }} />}
+              variant="glass"
+              disabled={!accepted}
+              loading={googleLoading}
+              onPress={continueWithGoogle}
+            />
           ) : null}
-          <AppText variant="caption" muted style={{ textAlign: 'center' }}>
-            By continuing you agree to our Terms and Privacy Policy.
-          </AppText>
+          <Pressable
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: accepted }}
+            onPress={() => setAccepted((v) => !v)}
+            hitSlop={8}
+            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm }}>
+            <Icon name={accepted ? 'checkbox-marked' : 'checkbox-blank-outline'} size={20} color={accepted ? colors.primary : colors.textMuted} />
+            <AppText variant="caption" muted>
+              I agree to the Terms and Privacy Policy
+            </AppText>
+          </Pressable>
         </Glass>
       </Animated.View>
     </Screen>

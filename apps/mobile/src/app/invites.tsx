@@ -33,7 +33,7 @@ export default function Invites() {
   if (invites.error) return <ErrorState message={errorMessage(invites.error)} onRetry={() => void invites.refetch()} />;
 
   return (
-    <Screen edges={[]}>
+    <Screen edges={[]} contentStyle={{ flexGrow: 1 }}>
       {invites.data?.length ? (
         invites.data.map((inv) => (
           <Card key={inv._id}>
@@ -55,7 +55,7 @@ export default function Invites() {
           </Card>
         ))
       ) : (
-        <EmptyState icon="email-open-outline" title="No pending invites" message="When someone adds you to a room, it shows up here." />
+        <EmptyState icon="email-open-outline" title="Nothing is Here" message="No pending room invites." />
       )}
     </Screen>
   );

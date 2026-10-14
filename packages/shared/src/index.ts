@@ -3,6 +3,7 @@ export * from './constants/currencies';
 export * from './constants/categories';
 export * from './constants/limits';
 export * from './money';
+export * from './bank';
 export * from './schemas';
 export * from './types';
 export * from './errors';

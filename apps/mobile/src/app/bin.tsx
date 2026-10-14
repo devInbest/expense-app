@@ -83,7 +83,7 @@ export default function Bin() {
           )}
           ListEmptyComponent={
             <View style={{ flex: 1, justifyContent: 'center' }}>
-              <EmptyState icon="trash-can-outline" title="Bin is empty" message="Transactions you move to the bin show up here." />
+              <EmptyState icon="trash-can-outline" title="Nothing is Here" message="Deleted transactions show up here." />
             </View>
           }
         />

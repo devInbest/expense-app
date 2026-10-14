@@ -1,6 +1,9 @@
 import type {
   ActorType,
   AdminRole,
+  BankTxnDirection,
+  BankTxnLinkKind,
+  BankTxnStatus,
   BudgetPeriod,
   CategoryOwnerType,
   InviteChannel,
@@ -179,6 +182,42 @@ export interface SyncPullResult {
   serverTime: ISODate;
   /** More changes are waiting; pull again with `serverTime`. */
   hasMore: boolean;
+}
+
+// ---------- Bank transactions (from SMS) ----------
+export interface BankTransactionDTO {
+  _id: string;
+  direction: BankTxnDirection;
+  amount: number;
+  currency: string;
+  occurredAt: ISODate;
+  counterparty: string;
+  bank: string;
+  accountMask: string;
+  reference: string;
+  paymentMethod: PaymentMethod;
+  status: BankTxnStatus;
+  /** What it was saved as. `id` is the transaction's clientId, or the room expense id. */
+  link?: { kind: BankTxnLinkKind; id: string; roomId?: string; userId?: string } | null;
+  /** Category used last time for the same counterparty. */
+  suggestion?: { categoryId: string; type: TransactionType } | null;
+  createdAt: ISODate;
+}
+
+export interface BankTransactionPage extends CursorPage<BankTransactionDTO> {
+  /** Total still waiting for review. */
+  pending: number;
+}
+
+export interface IngestBankTransactionsResult {
+  received: number;
+  added: number;
+}
+
+export interface LinkBankTransactionResult {
+  bankTransaction: BankTransactionDTO;
+  transaction?: TransactionDTO;
+  roomExpense?: RoomExpenseDTO;
 }
 
 export interface BudgetDTO {

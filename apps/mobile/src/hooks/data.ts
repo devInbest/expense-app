@@ -115,4 +115,14 @@ export const useSpendingSummary = (from: string, to: string, type: TransactionTy
   return { data, loading: local.loading, reload };
 };
 
+/** How many bank transactions are waiting for review. */
+export const useBankPendingCount = () => {
+  const query = useQuery({
+    queryKey: qk.bankSummary,
+    queryFn: () => api.bank.list({ limit: 1 }),
+    staleTime: 60_000,
+  });
+  return query.data?.pending ?? 0;
+};
+
 export const useSyncStatus = () => useSyncExternalStore(syncStatusStore.subscribe, syncStatusStore.getSnapshot);

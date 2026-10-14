@@ -1,7 +1,7 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { BlurView } from 'expo-blur';
 import { Image } from 'expo-image';
-import { createContext, useContext, useEffect, useState, type ComponentProps, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, type ComponentProps, type ReactElement, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -36,7 +36,6 @@ import Animated, {
   useSharedValue,
   withDelay,
   withRepeat,
-  withSequence,
   withTiming,
   type AnimatedRef,
   type SharedValue,
@@ -563,7 +562,7 @@ export function Button({
   variant?: ButtonVariant;
   loading?: boolean;
   disabled?: boolean;
-  icon?: string;
+  icon?: string | ReactElement;
   style?: StyleProp<ViewStyle>;
   compact?: boolean;
   /** Overrides the variant's text and icon color. */
@@ -651,7 +650,7 @@ export function Button({
           />
         </>
       ) : null}
-      {loading ? <ActivityIndicator color={tint} /> : icon ? <Icon name={icon} size={compact ? 16 : 20} color={tint} /> : null}
+      {loading ? <ActivityIndicator color={tint} /> : typeof icon === 'string' ? <Icon name={icon} size={compact ? 16 : 20} color={tint} /> : icon}
       <Text style={{ color: tint, fontWeight: '700', fontSize: compact ? 14 : 16, letterSpacing: 0.1 }}>{title}</Text>
     </AnimatedPressable>
   );
@@ -777,34 +776,32 @@ export function Field({
           {label}
         </AppText>
       ) : null}
-      <TextInput
-        placeholderTextColor={colors.textSubtle}
-        selectionColor={colors.primary}
-        cursorColor={colors.primary}
-        onFocus={(e) => {
-          setFocused(true);
-          onFocus?.(e);
-        }}
-        onBlur={(e) => {
-          setFocused(false);
-          onBlur?.(e);
-        }}
-        style={[
-          {
-            backgroundColor: focused ? colors.glassStrong : colors.glass,
-            borderColor: error ? colors.danger : focused ? colors.primary : colors.glassBorder,
-            borderWidth: 1.5,
-            borderRadius: radius.md,
-            paddingHorizontal: spacing.lg,
-            paddingVertical: 14,
-            fontSize: 16,
-            color: colors.text,
-            boxShadow: focused ? `0 0 0 4px ${colors.primaryMuted}` : `0 4px 14px ${colors.shadow}`,
-          },
-          style,
-        ]}
-        {...input}
-      />
+      {/* Padding lives on the wrapper: Android TextInput drops its own horizontal padding on re-render. */}
+      <View
+        style={{
+          backgroundColor: focused ? colors.glassStrong : colors.glass,
+          borderColor: error ? colors.danger : focused ? colors.primary : colors.glassBorder,
+          borderWidth: 1.5,
+          borderRadius: radius.md,
+          paddingHorizontal: spacing.lg,
+          boxShadow: focused ? `0 0 0 4px ${colors.primaryMuted}` : `0 4px 14px ${colors.shadow}`,
+        }}>
+        <TextInput
+          placeholderTextColor={colors.textSubtle}
+          selectionColor={colors.primary}
+          cursorColor={colors.primary}
+          onFocus={(e) => {
+            setFocused(true);
+            onFocus?.(e);
+          }}
+          onBlur={(e) => {
+            setFocused(false);
+            onBlur?.(e);
+          }}
+          style={[{ paddingHorizontal: 0, paddingVertical: 14, fontSize: 16, color: colors.text }, style]}
+          {...input}
+        />
+      </View>
       {error ? (
         <AppText variant="caption" color={colors.danger} style={{ paddingHorizontal: spacing.xs }}>
           {error}
@@ -1109,26 +1106,21 @@ export function CategoryIcon({
 // ---------- states ----------
 export function EmptyState({ icon, title, message, action }: { icon: string; title: string; message?: string; action?: ReactNode }) {
   const { colors } = useTheme();
-  const float = useSharedValue(0);
-  useEffect(() => {
-    float.set(withRepeat(withSequence(withTiming(-6, { duration: 1600 }), withTiming(0, { duration: 1600 })), -1));
-  }, [float]);
-  const floating = useAnimatedStyle(() => ({ transform: [{ translateY: float.get() }] }));
   return (
-    <Animated.View entering={FadeIn.duration(400)} style={{ alignItems: 'center', padding: spacing.xxl, gap: spacing.sm }}>
-      <Animated.View style={floating}>
-        <Glass rounded={36} style={{ width: 84, height: 84, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.sm }}>
-          <Icon name={icon} size={38} color={colors.primary} />
-        </Glass>
-      </Animated.View>
-      <AppText variant="subheading">{title}</AppText>
+    <View style={{ flexGrow: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xxl, gap: spacing.sm }}>
+      <Glass rounded={36} style={{ width: 84, height: 84, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.sm }}>
+        <Icon name={icon} size={38} color={colors.primary} />
+      </Glass>
+      <AppText variant="subheading" style={{ textAlign: 'center' }}>
+        {title}
+      </AppText>
       {message ? (
         <AppText muted style={{ textAlign: 'center' }}>
           {message}
         </AppText>
       ) : null}
       {action}
-    </Animated.View>
+    </View>
   );
 }
 

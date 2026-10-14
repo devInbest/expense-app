@@ -3,6 +3,8 @@ import type {
   ApiSuccess,
   AppSettingsDTO,
   AuthResult,
+  BankTransactionDTO,
+  BankTransactionPage,
   BudgetDTO,
   BudgetProgressDTO,
   CategoryDTO,
@@ -17,8 +19,13 @@ import type {
   CursorPage,
   DeviceInfo,
   ExportQuery,
+  IngestBankTransactionsInput,
+  IngestBankTransactionsResult,
   InsightsQuery,
   InsightsSummaryDTO,
+  LinkBankTransactionInput,
+  LinkBankTransactionResult,
+  ListBankTransactionsQuery,
   ListTransactionsQuery,
   NotificationDTO,
   OtpRequestResult,
@@ -115,6 +122,15 @@ export const createCustomerApi = (http: AxiosInstance) => {
       remove: (id: string) => del<null>(`/transactions/${id}`),
       syncPush: (body: SyncPushInput) => post<SyncPushResult>('/transactions/sync', body),
       syncPull: (since?: string) => get<SyncPullResult>('/transactions/sync', { since }),
+    },
+
+    bank: {
+      list: (q: ListBankTransactionsQuery = {}) => get<BankTransactionPage>('/bank-transactions', q as Params),
+      get: (id: string) => get<BankTransactionDTO>(`/bank-transactions/${id}`),
+      ingest: (body: IngestBankTransactionsInput) => post<IngestBankTransactionsResult>('/bank-transactions/ingest', body),
+      link: (id: string, body: LinkBankTransactionInput) => post<LinkBankTransactionResult>(`/bank-transactions/${id}/link`, body),
+      ignore: (id: string) => post<BankTransactionDTO>(`/bank-transactions/${id}/ignore`),
+      restore: (id: string) => post<BankTransactionDTO>(`/bank-transactions/${id}/restore`),
     },
 
     budgets: {

@@ -1,34 +1,20 @@
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, RefreshControl, View } from 'react-native';
+import { RefreshControl, View } from 'react-native';
 import { qk } from '@expense/api-client';
 import { Money, RoomExpenseRow, TransactionRow } from '@/components/finance';
 import { BudgetsCard } from '@/components/BudgetsCard';
 import { SpendCard } from '@/components/SpendCard';
 import { SyncBanner } from '@/components/SyncBanner';
-import {
-  AppText,
-  Appear,
-  Avatar,
-  Banner,
-  Card,
-  CategoryIcon,
-  EmptyState,
-  Fab,
-  IconButton,
-  Row,
-  Screen,
-  SectionHeader,
-  useTabBarInset,
-} from '@/components/ui';
+import { TabHeader } from '@/components/TabHeader';
+import { AppText, Appear, Banner, Card, CategoryIcon, EmptyState, Fab, Row, Screen, SectionHeader, useTabBarInset } from '@/components/ui';
 import { UNKNOWN_CATEGORY, useCategories, useLocalQuery, useSpendingSummary } from '@/hooks/data';
 import { api } from '@/lib/api';
 import { useUser } from '@/lib/auth';
 import { iso, monthRange } from '@/lib/dates';
 import { kv, PENDING_JOIN_KEY } from '@/lib/db';
 import { syncNow } from '@/lib/sync';
-import { setThemeMode } from '@/lib/themeMode';
 import { listTransactions } from '@/lib/transactions';
 import { spacing, useTheme } from '@/theme';
 
@@ -41,7 +27,7 @@ const greeting = () => {
 
 export default function Home() {
   const user = useUser();
-  const { colors, dark } = useTheme();
+  const { colors } = useTheme();
   const tabInset = useTabBarInset();
   const { byId } = useCategories();
   const [refreshing, setRefreshing] = useState(false);
@@ -66,7 +52,6 @@ export default function Home() {
   const budgets = useQuery({ queryKey: qk.budgets, queryFn: api.budgets.list });
   const invites = useQuery({ queryKey: qk.myInvites, queryFn: api.invites.mine });
   const notifications = useQuery({ queryKey: qk.notifications, queryFn: () => api.notifications.list() });
-
   useEffect(() => {
     // A join link opened before sign-in is resumed here.
     void kv.get<string>(PENDING_JOIN_KEY).then((code) => {
@@ -85,7 +70,6 @@ export default function Home() {
 
   const overall = budgets.data?.find((b) => !b.categoryId && b.period === 'monthly') ?? budgets.data?.find((b) => !b.categoryId);
   const categoryBudgets = (budgets.data ?? []).filter((b) => b.categoryId).sort((a, b) => b.percent - a.percent).slice(0, 3);
-  const unread = notifications.data?.unread ?? 0;
   const firstName = user.name.split(' ')[0];
   const topSpends = summary?.byCategory.slice(0, 5) ?? [];
   return (
@@ -93,57 +77,7 @@ export default function Home() {
       <Screen
         contentStyle={recent && !recent.length ? { flexGrow: 1, paddingBottom: tabInset + 80 } : { paddingBottom: tabInset + 80 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />}>
-        <Appear>
-          <Row gap={spacing.md}>
-            <Pressable onPress={() => router.navigate('/profile')} accessibilityRole="button" accessibilityLabel="Open profile" hitSlop={6}>
-              <Avatar name={user.name} uri={user.avatarUrl} size={48} />
-            </Pressable>
-            <View style={{ flex: 1 }}>
-              <AppText variant="caption" muted style={{ fontWeight: '600' }}>
-                {greeting()}
-              </AppText>
-              <AppText variant="heading" numberOfLines={1}>
-                {firstName || 'there'}
-              </AppText>
-            </View>
-            <IconButton
-              glass
-              icon={dark ? 'white-balance-sunny' : 'weather-night'}
-              label={dark ? 'Switch to light mode' : 'Switch to dark mode'}
-              onPress={() => setThemeMode(dark ? 'light' : 'dark')}
-            />
-            <View>
-              <IconButton
-                glass
-                icon="bell-outline"
-                label={unread ? `Notifications, ${unread} unread` : 'Notifications'}
-                onPress={() => router.push('/notifications')}
-              />
-              {unread ? (
-                <View
-                  pointerEvents="none"
-                  style={{
-                    position: 'absolute',
-                    top: -2,
-                    right: -2,
-                    minWidth: 18,
-                    height: 18,
-                    paddingHorizontal: 4,
-                    borderRadius: 9,
-                    backgroundColor: colors.primary,
-                    borderWidth: 2,
-                    borderColor: colors.background,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}>
-                  <AppText color={colors.onPrimary} style={{ fontSize: 10, lineHeight: 12, fontWeight: '800' }}>
-                    {unread > 9 ? '9+' : unread}
-                  </AppText>
-                </View>
-              ) : null}
-            </View>
-          </Row>
-        </Appear>
+        <TabHeader title={firstName || 'there'} subtitle={greeting()} />
 
         <SyncBanner />
 
@@ -185,7 +119,7 @@ export default function Home() {
           </Appear>
         ) : recent ? (
           <View style={{ flex: 1, justifyContent: 'center' }}>
-            <EmptyState icon="receipt" title="No expenses yet" message="Tap + to add your first transaction." />
+            <EmptyState icon="receipt" title="Nothing is Here" message="Tap + to add a transaction." />
           </View>
         ) : null}
 

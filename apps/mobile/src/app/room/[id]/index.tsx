@@ -187,14 +187,14 @@ export default function RoomScreen() {
           <FlatList
             data={items}
             keyExtractor={(e) => e._id}
-            contentContainerStyle={{ padding: spacing.lg, paddingBottom: listBottom }}
+            contentContainerStyle={{ flexGrow: 1, padding: spacing.lg, paddingBottom: listBottom }}
             showsVerticalScrollIndicator={false}
             onScroll={reveal.onScroll}
             scrollEventThrottle={reveal.scrollEventThrottle}
             ListHeaderComponent={header}
             refreshControl={<RefreshControl refreshing={expenses.isRefetching} onRefresh={refresh} tintColor={colors.primary} colors={[colors.primary]} />}
             onEndReached={() => expenses.hasNextPage && void expenses.fetchNextPage()}
-            ListEmptyComponent={expenses.isLoading ? <Loading /> : <EmptyState icon="receipt" title="No expenses yet" message="Add the first one with the + button." />}
+            ListEmptyComponent={expenses.isLoading ? <Loading /> : <EmptyState icon="receipt" title="Nothing is Here" message="Tap + to add an expense." />}
             renderItem={({ item, index }) => (
               <Appear index={index}>
                 <ExpenseRow
@@ -213,7 +213,7 @@ export default function RoomScreen() {
           <FlatList
             data={[]}
             renderItem={null}
-            contentContainerStyle={{ padding: spacing.lg, paddingBottom: listBottom }}
+            contentContainerStyle={{ flexGrow: 1, padding: spacing.lg, paddingBottom: listBottom }}
             showsVerticalScrollIndicator={false}
             onScroll={reveal.onScroll}
             scrollEventThrottle={reveal.scrollEventThrottle}

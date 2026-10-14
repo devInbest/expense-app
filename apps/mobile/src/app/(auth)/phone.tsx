@@ -40,8 +40,13 @@ export default function PhoneScreen() {
       <Appear index={1}>
         <Glass style={{ padding: spacing.lg, gap: spacing.lg }}>
           <Row style={{ alignItems: 'flex-start' }}>
-            <View style={{ width: 88 }}>
-              <Field value={countryCode} onChangeText={(t) => setCountryCode(`+${t.replace(/\D/g, '').slice(0, 4)}`)} keyboardType="phone-pad" />
+            <View style={{ width: 96 }}>
+              <Field
+                value={countryCode}
+                onChangeText={(t) => setCountryCode(`+${t.replace(/\D/g, '').slice(0, 4)}`)}
+                keyboardType="phone-pad"
+                style={{ textAlign: 'center' }}
+              />
             </View>
             <View style={{ flex: 1 }}>
               <Field

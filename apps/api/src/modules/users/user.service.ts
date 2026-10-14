@@ -4,6 +4,7 @@ import { ApiError } from '../../core/ApiError';
 import { verifyGoogleIdToken } from '../../lib/google';
 import { logActivity } from '../activity/activity.service';
 import { revokeAllSessions } from '../auth/session.service';
+import { BankTransaction, MerchantRule } from '../bank/bankTransaction.model';
 import { verifyOtp } from '../auth/otp.service';
 import { Budget } from '../budgets/budget.model';
 import { Category } from '../categories/category.model';
@@ -87,6 +88,8 @@ export const deleteAccount = async (user: UserDoc, req: Request) => {
 
   await Promise.all([
     Transaction.deleteMany({ userId }),
+    BankTransaction.deleteMany({ userId }),
+    MerchantRule.deleteMany({ userId }),
     Budget.deleteMany({ ownerType: 'user', ownerId: userId }),
     RecurringRule.deleteMany({ ownerType: 'user', ownerId: userId }),
     Category.deleteMany({ ownerType: 'user', ownerId: userId }),

@@ -447,6 +447,112 @@ describe('rooms', () => {
   });
 });
 
+describe('bank transactions', () => {
+  const item = (fingerprint: string, direction: 'debit' | 'credit', amount: number, counterparty = '') => ({
+    fingerprint,
+    direction,
+    amount,
+    occurredAt: new Date().toISOString(),
+    counterparty,
+    bank: 'HDFC Bank',
+    accountMask: '1234',
+    reference: fingerprint.split(':').pop(),
+    paymentMethod: 'upi',
+  });
+
+  it('ingests without duplicates, saves as personal, remembers the category, and ignores', async () => {
+    const user = await signUp(app, 'Banker');
+    const cats = await request(app).get(api('/categories')).set(user.auth).expect(200);
+    const food = cats.body.data.find((c: { key: string }) => c.key === 'food');
+
+    const first = await request(app)
+      .post(api('/bank-transactions/ingest'))
+      .set(user.auth)
+      .send({ items: [item('debit:25000:R1', 'debit', 25000, 'SWIGGY'), item('debit:9900:R2', 'debit', 9900, 'SWIGGY')] })
+      .expect(200);
+    expect(first.body.data).toEqual({ received: 2, added: 2 });
+    const again = await request(app).post(api('/bank-transactions/ingest')).set(user.auth).send({ items: [item('debit:25000:R1', 'debit', 25000, 'SWIGGY')] }).expect(200);
+    expect(again.body.data.added).toBe(0);
+
+    const list = await request(app).get(api('/bank-transactions')).set(user.auth).expect(200);
+    expect(list.body.data.pending).toBe(2);
+    const [newest, older] = list.body.data.items;
+    expect(newest.suggestion).toBeNull();
+
+    const linked = await request(app)
+      .post(api(`/bank-transactions/${newest._id}/link`))
+      .set(user.auth)
+      .send({
+        kind: 'transaction',
+        transaction: { clientId: 'bank-client-0001', type: 'expense', amount: newest.amount, categoryId: food._id, occurredAt: newest.occurredAt, note: 'SWIGGY' },
+      })
+      .expect(200);
+    expect(linked.body.data.bankTransaction.status).toBe('linked');
+    expect(linked.body.data.transaction.clientId).toBe('bank-client-0001');
+    await request(app).get(api('/transactions/sync')).set(user.auth).expect(200);
+
+    // Linking twice is refused; the same counterparty now suggests the category.
+    await request(app).post(api(`/bank-transactions/${newest._id}/link`)).set(user.auth).send({ kind: 'transaction', transaction: { clientId: 'bank-client-0002', amount: 1, categoryId: food._id, occurredAt: new Date().toISOString() } }).expect(409);
+    const next = await request(app).get(api(`/bank-transactions/${older._id}`)).set(user.auth).expect(200);
+    expect(next.body.data.suggestion).toEqual({ categoryId: food._id, type: 'expense' });
+
+    await request(app).post(api(`/bank-transactions/${older._id}/ignore`)).set(user.auth).expect(200);
+    const after = await request(app).get(api('/bank-transactions')).set(user.auth).expect(200);
+    expect(after.body.data.pending).toBe(0);
+    const ignored = await request(app).get(api('/bank-transactions')).query({ status: 'ignored' }).set(user.auth).expect(200);
+    expect(ignored.body.data.items).toHaveLength(1);
+    await request(app).post(api(`/bank-transactions/${older._id}/restore`)).set(user.auth).expect(200);
+
+    // Other users can't see or touch it.
+    const stranger = await signUp(app, 'Stranger');
+    await request(app).get(api(`/bank-transactions/${older._id}`)).set(stranger.auth).expect(404);
+  });
+
+  it('turns bank transactions into room expenses and share payments', async () => {
+    const owner = await signUp(app, 'Payer');
+    const friend = await signUp(app, 'Payee');
+    const room = await request(app).post(api('/rooms')).set(owner.auth).send({ name: 'Flat', type: 'split' }).expect(201);
+    const roomId = room.body.data._id;
+    await request(app).post(api('/rooms/join')).set(friend.auth).send({ code: room.body.data.inviteCode }).expect(200);
+
+    await request(app).post(api('/bank-transactions/ingest')).set(owner.auth).send({ items: [item('debit:4000:E1', 'debit', 4000, 'BIGBASKET'), item('credit:2000:C1', 'credit', 2000, 'payee@ybl')] }).expect(200);
+    await request(app).post(api('/bank-transactions/ingest')).set(friend.auth).send({ items: [item('debit:2000:C1', 'debit', 2000, 'payer@ybl')] }).expect(200);
+    const mine = await request(app).get(api('/bank-transactions')).set(owner.auth).expect(200);
+    const debit = mine.body.data.items.find((i: { direction: string }) => i.direction === 'debit');
+    const credit = mine.body.data.items.find((i: { direction: string }) => i.direction === 'credit');
+
+    // A credit can't be a room expense.
+    await request(app)
+      .post(api(`/bank-transactions/${credit._id}/link`))
+      .set(owner.auth)
+      .send({ kind: 'room_expense', roomId, expense: { amount: 2000, occurredAt: credit.occurredAt } })
+      .expect(400);
+
+    const expense = await request(app)
+      .post(api(`/bank-transactions/${debit._id}/link`))
+      .set(owner.auth)
+      .send({ kind: 'room_expense', roomId, expense: { amount: 4000, note: 'Groceries', occurredAt: debit.occurredAt, splitType: 'equal' } })
+      .expect(200);
+    const expenseId = expense.body.data.roomExpense._id;
+    expect(expense.body.data.bankTransaction.link).toMatchObject({ kind: 'room_expense', id: expenseId, roomId });
+
+    // The friend's debit pays their own share; it can't be used for someone else's.
+    const theirs = await request(app).get(api('/bank-transactions')).set(friend.auth).expect(200);
+    const payment = theirs.body.data.items[0];
+    await request(app).post(api(`/bank-transactions/${payment._id}/link`)).set(friend.auth).send({ kind: 'room_payment', roomId, expenseId, userId: owner.id }).expect(400);
+    const paid = await request(app).post(api(`/bank-transactions/${payment._id}/link`)).set(friend.auth).send({ kind: 'room_payment', roomId, expenseId, userId: friend.id }).expect(200);
+    const share = paid.body.data.roomExpense.splits.find((s: { userId: string }) => s.userId === friend.id);
+    expect(share.paidViaUpi).toBe(true);
+    expect(share.upiTxnId).toBe('C1');
+
+    // The owner's matching credit records receiving it (already paid, so nothing changes).
+    const received = await request(app).post(api(`/bank-transactions/${credit._id}/link`)).set(owner.auth).send({ kind: 'room_payment', roomId, expenseId, userId: friend.id }).expect(200);
+    expect(received.body.data.bankTransaction.status).toBe('linked');
+    const balances = await request(app).get(api(`/rooms/${roomId}/balances`)).set(owner.auth).expect(200);
+    expect(balances.body.data.net[friend.id]).toBe(0);
+  });
+});
+
 describe('admin', () => {
   it('shows the dashboard and can block a user', async () => {
     const admin = await adminLogin(app);

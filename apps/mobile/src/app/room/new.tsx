@@ -92,10 +92,10 @@ export default function NewRoom() {
         label="Room name"
         value={name}
         onChangeText={setName}
-        placeholder=" e.g. Goa trip, Flat 302"
+        placeholder="e.g. Goa trip, Flat 302"
         maxLength={24}
         autoFocus
-        style={{ paddingHorizontal: 16, paddingVertical: 18 }}
+        style={{ paddingVertical: 18 }}
       />
       <Section title="Type">
         {TYPES.map((t) => {

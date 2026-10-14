@@ -90,7 +90,7 @@ export default function Budgets() {
           })
         ) : (
           <View style={{ flex: 1, justifyContent: 'center' }}>
-            <EmptyState icon="target" title="No budgets yet" />
+            <EmptyState icon="target" title="Nothing is Here" message="Add a budget to track spending." />
           </View>
         )}
       </Screen>

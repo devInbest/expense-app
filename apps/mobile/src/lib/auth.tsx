@@ -5,6 +5,7 @@ import { qk } from '@expense/api-client';
 import type { AuthResult, CategoryDTO, UserDTO } from '@expense/shared';
 import { api, isOffline, setAuthFailureHandler } from './api';
 import { flushEvents, startSession } from './analytics';
+import { promptSmsAccess } from './bankSms';
 import { clearLocalData, initDb, kv } from './db';
 import { googleSignOut } from './google';
 import { registerForPush, unregisterPush } from './push';
@@ -70,7 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const afterSignedIn = useCallback((u: UserDTO) => {
     startSession();
     void syncNow();
-    if (u.onboarded) void registerForPush();
+    if (u.onboarded) void registerForPush().then(promptSmsAccess);
   }, []);
 
   const bootstrap = useCallback(async () => {

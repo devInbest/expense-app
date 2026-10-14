@@ -9,8 +9,10 @@ import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { qk } from '@expense/api-client';
 import { compareVersions } from '@expense/shared';
+import { BrandSplash } from '@/components/BrandSplash';
+import { StackHeader } from '@/components/StackHeader';
 import { AppText, Backdrop, Button, EmptyState } from '@/components/ui';
-import { useAppLifecycle, useNotificationRouting, useScreenTracking } from '@/hooks/lifecycle';
+import { useAppLifecycle, useBankSmsImport, useNotificationRouting, useScreenTracking } from '@/hooks/lifecycle';
 import { api } from '@/lib/api';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { config } from '@/lib/config';
@@ -39,33 +41,41 @@ export default function RootLayout() {
 
 function RootNavigator() {
   const { status, user, retry } = useAuth();
-  const { dark, colors } = useTheme();
   const signedIn = status === 'signedIn' && !!user;
   const onboarded = signedIn && user.onboarded;
 
   useEffect(() => {
-    if (status !== 'loading') void SplashScreen.hideAsync();
-  }, [status]);
+    void SplashScreen.hideAsync();
+  }, []);
 
   useAppLifecycle(signedIn);
   useScreenTracking(signedIn);
   useNotificationRouting(onboarded);
+  useBankSmsImport(onboarded);
 
+  return (
+    <View style={{ flex: 1 }}>
+      {status === 'unreachable' ? (
+        <View style={{ flex: 1, justifyContent: 'center' }}>
+          <Backdrop />
+          <EmptyState
+            icon="cloud-off-outline"
+            title="Can't reach the server"
+            message="Check your connection and try again."
+            action={<Button title="Retry" onPress={retry} />}
+          />
+        </View>
+      ) : (
+        <AppNavigator signedIn={signedIn} onboarded={onboarded} />
+      )}
+      <BrandSplash ready={status !== 'loading'} />
+    </View>
+  );
+}
+
+function AppNavigator({ signedIn, onboarded }: { signedIn: boolean; onboarded: boolean }) {
+  const { dark, colors } = useTheme();
   const navTheme = dark ? DarkTheme : DefaultTheme;
-
-  if (status === 'unreachable') {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center' }}>
-        <Backdrop />
-        <EmptyState
-          icon="cloud-off-outline"
-          title="Can't reach the server"
-          message="Check your connection and try again."
-          action={<Button title="Retry" onPress={retry} />}
-        />
-      </View>
-    );
-  }
 
   return (
     <ThemeProvider
@@ -77,11 +87,7 @@ function RootNavigator() {
       <AppGate>
         <Stack
           screenOptions={{
-            headerBackButtonDisplayMode: 'minimal',
-            headerShadowVisible: false,
-            headerStyle: { backgroundColor: colors.background },
-            headerTintColor: colors.text,
-            headerTitleStyle: { fontWeight: '700', fontSize: 17 },
+            header: (props) => <StackHeader {...props} />,
             contentStyle: { backgroundColor: colors.background },
           }}>
           <Stack.Protected guard={!signedIn}>
@@ -94,6 +100,7 @@ function RootNavigator() {
 
           <Stack.Protected guard={onboarded}>
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="profile" options={{ title: 'Profile' }} />
             <Stack.Screen name="transaction/[id]" options={{ presentation: 'modal', title: 'Transaction' }} />
             <Stack.Screen name="transaction/view/[id]" options={{ title: 'Transaction' }} />
             <Stack.Screen name="bin" options={{ title: 'Bin' }} />
@@ -105,6 +112,7 @@ function RootNavigator() {
             <Stack.Screen name="sessions" options={{ title: 'Devices' }} />
             <Stack.Screen name="account" options={{ title: 'Account' }} />
             <Stack.Screen name="export" options={{ title: 'Report' }} />
+            <Stack.Screen name="bank/[id]" options={{ title: '' }} />
             <Stack.Screen name="room/new" options={{ presentation: 'modal', title: 'New room' }} />
             <Stack.Screen name="room/[id]/index" options={{ title: '' }} />
             <Stack.Screen name="room/[id]/expense" options={{ presentation: 'modal', title: 'Expense' }} />

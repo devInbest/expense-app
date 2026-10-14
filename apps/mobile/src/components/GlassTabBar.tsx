@@ -12,12 +12,14 @@ function TabItem({
   focused,
   label,
   icon,
+  badge,
   onPress,
   onLongPress,
 }: {
   focused: boolean;
   label: string;
   icon: (color: string) => React.ReactNode;
+  badge?: string | number;
   onPress: () => void;
   onLongPress: () => void;
 }) {
@@ -32,11 +34,32 @@ function TabItem({
     <Pressable
       accessibilityRole="tab"
       accessibilityState={{ selected: focused }}
-      accessibilityLabel={label}
+      accessibilityLabel={badge != null ? `${label}, ${badge} new` : label}
       onPress={onPress}
       onLongPress={onLongPress}
       style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 2 }}>
-      <Animated.View style={iconStyle}>{icon(color)}</Animated.View>
+      <Animated.View style={iconStyle}>
+        {icon(color)}
+        {badge != null ? (
+          <View
+            style={{
+              position: 'absolute',
+              top: -4,
+              right: -10,
+              minWidth: 16,
+              height: 16,
+              paddingHorizontal: 4,
+              borderRadius: 8,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: focused ? colors.onPrimary : colors.danger,
+            }}>
+            <Text style={{ fontSize: 10, fontWeight: '800', color: focused ? colors.primary : '#fff' }}>
+              {typeof badge === 'number' && badge > 99 ? '99+' : badge}
+            </Text>
+          </View>
+        ) : null}
+      </Animated.View>
       <Text numberOfLines={1} style={{ fontSize: 10, fontWeight: focused ? '700' : '600', color }}>
         {label}
       </Text>
@@ -108,6 +131,7 @@ export function GlassTabBar({ state, descriptors, navigation, insets }: BottomTa
               focused={focused}
               label={label}
               icon={(color) => options.tabBarIcon?.({ focused, color, size: 22 })}
+              badge={options.tabBarBadge}
               onPress={() => {
                 const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
                 if (!focused && !event.defaultPrevented) {

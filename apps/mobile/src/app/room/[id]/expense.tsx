@@ -1,7 +1,7 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, TextInput, View } from 'react-native';
 import { qk } from '@expense/api-client';
 import {
   computeSplits,
@@ -30,13 +30,18 @@ const SPLIT_OPTIONS: { value: SplitType; label: string }[] = [
 ];
 
 export default function RoomExpenseForm() {
-  const { id, expenseId } = useLocalSearchParams<{ id: string; expenseId?: string }>();
+  const { id, expenseId, bankTxnId } = useLocalSearchParams<{ id: string; expenseId?: string; bankTxnId?: string }>();
   const { colors } = useTheme();
   const queryClient = useQueryClient();
   const { categories } = useCategories();
   const r = useRoom(id);
   const room = r.room;
   const isSplit = room?.type === 'split';
+  const bankTxn = useQuery({
+    queryKey: qk.bankTransaction(bankTxnId ?? ''),
+    queryFn: () => api.bank.get(bankTxnId!),
+    enabled: Boolean(bankTxnId),
+  });
 
   const existing = useMemo(() => {
     if (!expenseId) return null;
@@ -59,10 +64,18 @@ export default function RoomExpenseForm() {
   const [initialised, setInitialised] = useState(false);
 
   useEffect(() => {
-    if (!room || initialised) return;
+    if (!room || initialised || (bankTxnId && !bankTxn.data)) return;
     const currency = room.currency;
-    if (existing) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time form hydration once the room has loaded
+    const fromBank = bankTxn.data;
+    if (fromBank) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time form hydration once the room (and bank SMS, if any) has loaded
+      setAmount(String(fromMinor(fromBank.amount, currency)));
+      setNote(fromBank.counterparty);
+      setDate(new Date(fromBank.occurredAt));
+      setMethod(fromBank.paymentMethod);
+      if (fromBank.suggestion?.type === 'expense') setCategoryId(fromBank.suggestion.categoryId);
+      setIncluded(new Set(r.active.map((m) => m.user._id)));
+    } else if (existing) {
       setAmount(String(fromMinor(existing.amount, currency)));
       setNote(existing.note);
       setCategoryId(existing.categoryId);
@@ -77,7 +90,7 @@ export default function RoomExpenseForm() {
       setIncluded(new Set(r.active.map((m) => m.user._id)));
     }
     setInitialised(true);
-  }, [room, existing, initialised, r.active]);
+  }, [room, existing, initialised, r.active, bankTxnId, bankTxn.data]);
 
   // Members who left still appear if they're part of an existing expense.
   const people = useMemo(() => {
@@ -112,7 +125,7 @@ export default function RoomExpenseForm() {
   }, [isSplit, total, splitType, splitInputs]);
 
   const save = useMutation({
-    mutationFn: () => {
+    mutationFn: (): Promise<unknown> => {
       const details = { note: note.trim(), categoryId, occurredAt: date.toISOString(), paymentMethod: method };
       if (existing && hasPaidShares) return api.rooms.updateExpense(id, existing._id, details);
       if (total <= 0) throw new Error('Enter an amount');
@@ -124,24 +137,20 @@ export default function RoomExpenseForm() {
         splitType: isSplit ? splitType : undefined,
         splits: isSplit ? splitInputs : undefined,
       };
-      return existing ? api.rooms.updateExpense(id, existing._id, body) : api.rooms.addExpense(id, body);
+      if (existing) return api.rooms.updateExpense(id, existing._id, body);
+      if (bankTxnId) return api.bank.link(bankTxnId, { kind: 'room_expense', roomId: id, expense: body });
+      return api.rooms.addExpense(id, body);
     },
     onSuccess: () => {
       if (!existing) trackFeature(`room_expense_${isSplit ? splitType : 'shared'}`);
       void queryClient.invalidateQueries({ queryKey: qk.room(id) });
       void queryClient.invalidateQueries({ queryKey: qk.roomSpendingAll });
-      router.back();
-    },
-    onError: (err) => setError(errorMessage(err)),
-  });
-
-  const remove = useMutation({
-    mutationFn: () => api.rooms.removeExpense(id, existing!._id),
-    onSuccess: () => {
-      queryClient.removeQueries({ queryKey: qk.roomExpense(id, existing!._id) });
-      void queryClient.invalidateQueries({ queryKey: qk.room(id) });
-      void queryClient.invalidateQueries({ queryKey: qk.roomSpendingAll });
-      router.dismissTo({ pathname: '/room/[id]', params: { id } });
+      if (bankTxnId) {
+        void queryClient.invalidateQueries({ queryKey: qk.bankAll });
+        router.dismissTo('/bank');
+      } else {
+        router.back();
+      }
     },
     onError: (err) => setError(errorMessage(err)),
   });
@@ -178,7 +187,7 @@ export default function RoomExpenseForm() {
     <Screen edges={['bottom']} contentStyle={{ paddingBottom: spacing.sm }}>
       <Stack.Screen options={{ title: existing ? 'Edit expense' : `Add to ${room.name}` }} />
       {hasPaidShares ? (
-        <Banner tone="warning" icon="lock-outline" text="Some shares are marked paid. Undo them to change the amount or split, or to delete." />
+        <Banner tone="warning" icon="lock-outline" text="Some shares are marked paid. Undo them to change the amount or split." />
       ) : (
         <AmountInput value={amount} onChange={setAmount} currency={currency} autoFocus={!existing} />
       )}
@@ -290,22 +299,7 @@ export default function RoomExpenseForm() {
       <DateField label="Date" value={date} onChange={setDate} />
 
       <ErrorText>{error === preview.error && hasSplitValues ? null : error}</ErrorText>
-      <View style={{ gap: spacing.sm }}>
-        <Button title={existing ? 'Save changes' : 'Add expense'} onPress={() => save.mutate()} loading={save.isPending} />
-        {existing && !hasPaidShares ? (
-          <Button
-            title="Delete expense"
-            variant="danger"
-            loading={remove.isPending}
-            onPress={() =>
-              Alert.alert('Delete expense?', 'Balances will be recalculated for everyone.', [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Delete', style: 'destructive', onPress: () => remove.mutate() },
-              ])
-            }
-          />
-        ) : null}
-      </View>
+      <Button title={existing ? 'Save changes' : 'Add expense'} onPress={() => save.mutate()} loading={save.isPending} />
     </Screen>
   );
 }
@@ -392,7 +386,7 @@ function MoneyCell({ value, onChange, suffix }: { value: string; onChange: (v: s
         keyboardType="decimal-pad"
         placeholder="0"
         placeholderTextColor={colors.textMuted}
-        style={{ flex: 1, paddingVertical: 6, color: colors.text, textAlign: 'right' }}
+        style={{ flex: 1, paddingHorizontal: 0, paddingVertical: 6, color: colors.text, textAlign: 'right' }}
       />
       {suffix ? <AppText muted> {suffix}</AppText> : null}
     </View>

@@ -8,6 +8,7 @@ import { qk } from '@expense/api-client';
 import type { RoomSpendingItemDTO, TransactionType } from '@expense/shared';
 import { Money, RoomExpenseRow, TransactionRow } from '@/components/finance';
 import { SyncBanner } from '@/components/SyncBanner';
+import { TabHeader } from '@/components/TabHeader';
 import {
   AppText,
   Appear,
@@ -245,6 +246,7 @@ export default function Transactions() {
       <Backdrop />
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
         <View style={{ padding: spacing.lg, gap: spacing.md }}>
+          <TabHeader title="Activity" />
           <Appear>
             <MonthCard from={month.from} to={month.to} count={summary?.count ?? 0} />
           </Appear>
@@ -340,7 +342,7 @@ export default function Transactions() {
             }}
             ListEmptyComponent={
               <View style={{ flex: 1, justifyContent: 'center' }}>
-                <EmptyState icon="text-box-search-outline" title={type ? 'No matches' : 'Nothing this month'} />
+                <EmptyState icon="text-box-search-outline" title="Nothing is Here" message={type === 'expense' ? 'No expenses this month.' : type === 'income' ? 'No income this month.' : 'No transactions this month.'} />
               </View>
             }
           />

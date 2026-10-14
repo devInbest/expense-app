@@ -6,7 +6,7 @@ import { qk } from '@expense/api-client';
 import { computeExpenseDebts, formatMoney, type PaymentMethod, type RoomExpenseDTO } from '@expense/shared';
 import { Money } from '@/components/finance';
 import { PaySheet, type PayDetails } from '@/components/PaySheet';
-import { AppText, BottomBar, Avatar, Button, Card, CategoryIcon, ErrorState, Icon, Loading, Row, Screen, Section } from '@/components/ui';
+import { AppText, Avatar, Button, Card, CategoryIcon, ErrorState, Icon, Loading, Row, Screen, Section } from '@/components/ui';
 import { useCategories } from '@/hooks/data';
 import { useRoom } from '@/hooks/rooms';
 import { api, errorMessage } from '@/lib/api';
@@ -44,6 +44,16 @@ export default function RoomExpenseDetail() {
     },
     onError: (err) => Alert.alert('Could not update', errorMessage(err)),
   });
+  const remove = useMutation({
+    mutationFn: () => api.rooms.removeExpense(id, expenseId),
+    onSuccess: () => {
+      queryClient.removeQueries({ queryKey: qk.roomExpense(id, expenseId) });
+      void queryClient.invalidateQueries({ queryKey: qk.room(id) });
+      void queryClient.invalidateQueries({ queryKey: qk.roomSpendingAll });
+      router.back();
+    },
+    onError: (err) => Alert.alert("Couldn't delete", errorMessage(err)),
+  });
   const e = expense.data;
   const owes = useMemo(() => {
     const map = new Map<string, number>();
@@ -60,6 +70,7 @@ export default function RoomExpenseDetail() {
   const isSplit = room.type === 'split';
   const category = e.categoryId ? byId.get(e.categoryId) : undefined;
   const canEdit = r.canEditExpense(e);
+  const canDelete = canEdit && !e.splits.some((s) => s.paidAt);
   const canMark = r.canMarkPaid(e);
   const debtors = e.splits.filter((s) => owes.has(s.userId));
   const paidCount = debtors.filter((s) => s.paidAt).length;
@@ -80,7 +91,7 @@ export default function RoomExpenseDetail() {
 
   return (
     <View style={{ flex: 1 }}>
-      <Screen edges={[]} contentStyle={{ paddingBottom: spacing.lg }}>
+      <Screen edges={['bottom']} contentStyle={{ paddingBottom: spacing.lg }}>
         <Card style={{ alignItems: 'center', paddingVertical: spacing.xl, gap: spacing.xs }}>
           <CategoryIcon icon={category?.icon ?? 'receipt'} color={category?.color ?? colors.primary} size={56} />
           <AppText variant="subheading" numberOfLines={2} style={{ textAlign: 'center', marginTop: spacing.sm }}>
@@ -163,20 +174,27 @@ export default function RoomExpenseDetail() {
             </AppText>
           </Row>
         ) : null}
+
+        {canEdit ? (
+          <View style={{ gap: spacing.sm }}>
+            <Button title="Edit expense" icon="pencil-outline" onPress={() => router.push({ pathname: '/room/[id]/expense', params: { id, expenseId } })} />
+            {canDelete ? (
+              <Button
+                title="Delete expense"
+                icon="delete-outline"
+                variant="danger"
+                loading={remove.isPending}
+                onPress={() =>
+                  Alert.alert('Delete expense?', 'Balances will be recalculated for everyone.', [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Delete', style: 'destructive', onPress: () => remove.mutate() },
+                  ])
+                }
+              />
+            ) : null}
+          </View>
+        ) : null}
       </Screen>
-      {canEdit ? (
-        <BottomBar>
-          <Button
-            title="Edit expense"
-            onPress={() =>
-              router.push({
-                pathname: '/room/[id]/expense',
-                params: { id, expenseId },
-              })
-            }
-          />
-        </BottomBar>
-      ) : null}
       {paying ? <PaySheet visible onClose={() => setPaying(null)} payment={paying} /> : null}
     </View>
   );

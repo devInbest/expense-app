@@ -6,6 +6,7 @@ import { useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
 import { qk } from '@expense/api-client';
 import { flushEvents, startSession, trackScreen } from '@/lib/analytics';
+import { autoScanBankSms, onNewSms } from '@/lib/bankSms';
 import { getNotifications, hrefForNotification } from '@/lib/push';
 import { scheduleSync, syncNow } from '@/lib/sync';
 
@@ -39,6 +40,42 @@ export function useAppLifecycle(active: boolean) {
       clearInterval(heartbeat);
     };
   }, [active]);
+}
+
+const BANK_SCAN_INTERVAL_MS = 2 * 60_000;
+/** One incoming SMS can touch the SMS store several times; wait for it to settle. */
+const NEW_SMS_DEBOUNCE_MS = 1500;
+
+/** Picks up new bank SMS on launch, on return to the foreground, and as soon as a new SMS arrives. */
+export function useBankSmsImport(active: boolean) {
+  const queryClient = useQueryClient();
+  useEffect(() => {
+    if (!active) return;
+    let lastRun = 0;
+    let pending: ReturnType<typeof setTimeout> | null = null;
+    const scan = () => {
+      lastRun = Date.now();
+      void autoScanBankSms().then((added) => {
+        if (added > 0) void queryClient.invalidateQueries({ queryKey: qk.bankAll });
+      });
+    };
+    const runThrottled = () => {
+      if (Date.now() - lastRun >= BANK_SCAN_INTERVAL_MS) scan();
+    };
+    runThrottled();
+    const appState = AppState.addEventListener('change', (state) => {
+      if (state === 'active') runThrottled();
+    });
+    const unsubscribeSms = onNewSms(() => {
+      if (pending) clearTimeout(pending);
+      pending = setTimeout(scan, NEW_SMS_DEBOUNCE_MS);
+    });
+    return () => {
+      appState.remove();
+      unsubscribeSms();
+      if (pending) clearTimeout(pending);
+    };
+  }, [active, queryClient]);
 }
 
 const ID_SEGMENT = /^([0-9a-f]{24}|[0-9a-f-]{36}|[A-Z0-9]{6,12})$/i;

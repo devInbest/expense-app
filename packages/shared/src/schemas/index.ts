@@ -3,4 +3,5 @@ export * from './auth';
 export * from './user';
 export * from './finance';
 export * from './room';
+export * from './bank';
 export * from './admin';

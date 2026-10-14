@@ -1,4 +1,5 @@
 import { Stack } from 'expo-router';
+import { StackHeader } from '@/components/StackHeader';
 import { useTheme } from '@/theme';
 
 export default function AuthLayout() {
@@ -7,11 +8,8 @@ export default function AuthLayout() {
     <Stack
       initialRouteName="welcome"
       screenOptions={{
-        headerShadowVisible: false,
+        header: (props) => <StackHeader {...props} />,
         headerTitle: '',
-        headerBackButtonDisplayMode: 'minimal',
-        headerStyle: { backgroundColor: colors.background },
-        headerTintColor: colors.text,
         contentStyle: { backgroundColor: colors.background },
       }}>
       <Stack.Screen name="welcome" options={{ headerShown: false }} />

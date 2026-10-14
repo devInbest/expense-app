@@ -20,7 +20,6 @@ import {
   Segmented,
   Sheet,
   ToggleRow,
-  useTabBarInset,
 } from '@/components/ui';
 import { useSyncStatus } from '@/hooks/data';
 import { api, errorMessage, showError } from '@/lib/api';
@@ -41,7 +40,6 @@ const PREFS: { key: keyof NotificationPrefs; label: string }[] = [
 export default function Profile() {
   const user = useUser();
   const { colors } = useTheme();
-  const tabInset = useTabBarInset();
   const { signOut, setUser } = useAuth();
   const sync = useSyncStatus();
   const themeMode = useThemeMode();
@@ -103,7 +101,7 @@ export default function Profile() {
     );
 
   return (
-    <Screen contentStyle={{ paddingBottom: tabInset + spacing.lg }}>
+    <Screen edges={['bottom']} contentStyle={{ paddingBottom: spacing.lg }}>
       <Appear>
         <Glass blur rounded={30} style={{ alignItems: 'center', padding: spacing.xl, gap: spacing.sm, overflow: 'hidden' }}>
           <View

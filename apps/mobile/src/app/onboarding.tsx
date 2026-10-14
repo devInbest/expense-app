@@ -6,6 +6,7 @@ import { CurrencyField } from '@/components/CurrencyField';
 import { Appear, Button, Field, Glass, Screen } from '@/components/ui';
 import { api, errorMessage } from '@/lib/api';
 import { useAuth, useUser } from '@/lib/auth';
+import { promptSmsAccess } from '@/lib/bankSms';
 import { registerForPush } from '@/lib/push';
 import { spacing } from '@/theme';
 
@@ -37,7 +38,7 @@ export default function Onboarding() {
     try {
       const updated = await api.me.onboard(parsed.data);
       setUser(updated);
-      void registerForPush();
+      void registerForPush().then(promptSmsAccess);
     } catch (err) {
       setError(errorMessage(err));
     } finally {

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Alert, BackHandler, RefreshControl, View } from 'react-native';
 import { qk } from '@expense/api-client';
 import { formatMoney } from '@expense/shared';
+import { TabHeader } from '@/components/TabHeader';
 import {
   AppText,
   Appear,
@@ -125,22 +126,27 @@ export default function Rooms() {
       <Screen
         contentStyle={{ flexGrow: 1, paddingBottom: tabInset + 90 }}
         refreshControl={<RefreshControl refreshing={rooms.isRefetching} onRefresh={refresh} tintColor={colors.primary} colors={[colors.primary]} />}>
-        <Appear>
-          <Row>
-            {showArchived && !selected.size ? <IconButton glass icon="arrow-left" label="Back to rooms" onPress={closeArchived} /> : null}
-            <AppText variant={selected.size ? 'heading' : 'title'} style={{ flex: 1 }}>
-              {selected.size ? `${selected.size} selected` : showArchived ? 'Archived' : 'Rooms'}
-            </AppText>
-            {selected.size ? (
-              <>
-                <IconButton glass icon="close" label="Clear selection" onPress={() => setSelected(new Set())} />
-                <IconButton glass icon="trash-can-outline" label="Delete selected rooms" color={colors.danger} onPress={confirmDelete} />
-              </>
-            ) : showArchived ? null : (
-              <IconButton glass icon="archive-outline" label="Show archived rooms" color={colors.textMuted} onPress={() => setShowArchived(true)} />
-            )}
-          </Row>
-        </Appear>
+        {showArchived ? (
+          <Appear>
+            <Row>
+              {selected.size ? null : <IconButton glass icon="arrow-left" label="Back to rooms" onPress={closeArchived} />}
+              <AppText variant={selected.size ? 'heading' : 'title'} style={{ flex: 1 }}>
+                {selected.size ? `${selected.size} selected` : 'Archived'}
+              </AppText>
+              {selected.size ? (
+                <>
+                  <IconButton glass icon="close" label="Clear selection" onPress={() => setSelected(new Set())} />
+                  <IconButton glass icon="trash-can-outline" label="Delete selected rooms" color={colors.danger} onPress={confirmDelete} />
+                </>
+              ) : null}
+            </Row>
+          </Appear>
+        ) : (
+          <TabHeader
+            title="Rooms"
+            actions={<IconButton glass icon="archive-outline" label="Show archived rooms" color={colors.textMuted} onPress={() => setShowArchived(true)} />}
+          />
+        )}
 
         {invites.data?.length ? (
           <Banner icon="email-outline" text={`${invites.data.length} pending invite${invites.data.length > 1 ? 's' : ''}`} onPress={() => router.push('/invites')} />
@@ -222,8 +228,8 @@ export default function Rooms() {
           <View style={{ flex: 1, justifyContent: 'center' }}>
             <EmptyState
               icon="account-group-outline"
-              title={showArchived ? 'No archived rooms' : 'No rooms yet'}
-              message={showArchived ? undefined : 'Create a room to share expenses with friends, family or flatmates.'}
+              title="Nothing is Here"
+              message={showArchived ? 'No archived rooms.' : 'Create or join a room to start.'}
             />
           </View>
         )}

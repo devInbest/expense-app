@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { formatMoney, type PaymentMethod, type TransactionType } from '@expense/shared';
 import { Money, TransactionRow } from '@/components/finance';
+import { TabHeader } from '@/components/TabHeader';
 import { TrendChart } from '@/components/TrendChart';
 import {
   AppText,
@@ -160,7 +161,7 @@ function FilteredTransactionsSheet({
           </Section>
         </>
       ) : (
-        <EmptyState icon="text-box-search-outline" title="No transactions" />
+        <EmptyState icon="text-box-search-outline" title="Nothing is Here" message="No transactions found." />
       )}
     </Sheet>
   );
@@ -201,7 +202,7 @@ export default function Insights() {
     <View style={{ flex: 1 }}>
       <Screen contentStyle={{ flexGrow: 1, paddingBottom: tabInset + spacing.lg }}>
         <Appear style={{ gap: spacing.lg }}>
-          <AppText variant="title">Insights</AppText>
+          <TabHeader title="Insights" />
           <Segmented
             options={[
               { value: 'expense', label: 'Spending' },
@@ -346,7 +347,7 @@ export default function Insights() {
           </Appear>
         ) : (
           <View style={{ flex: 1, justifyContent: 'center' }}>
-            <EmptyState icon="chart-donut" title="No data for this period" />
+            <EmptyState icon="chart-donut" title="Nothing is Here" message="No data for this period." />
           </View>
         )}
 

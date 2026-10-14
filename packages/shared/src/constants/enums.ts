@@ -27,6 +27,19 @@ export const PAYMENT_METHODS = {
 export type PaymentMethod = (typeof PAYMENT_METHODS)[keyof typeof PAYMENT_METHODS];
 export const PAYMENT_METHOD_VALUES = values(PAYMENT_METHODS);
 
+export const BANK_TXN_DIRECTIONS = { DEBIT: 'debit', CREDIT: 'credit' } as const;
+export type BankTxnDirection = (typeof BANK_TXN_DIRECTIONS)[keyof typeof BANK_TXN_DIRECTIONS];
+export const BANK_TXN_DIRECTION_VALUES = values(BANK_TXN_DIRECTIONS);
+
+export const BANK_TXN_STATUS = { PENDING: 'pending', LINKED: 'linked', IGNORED: 'ignored' } as const;
+export type BankTxnStatus = (typeof BANK_TXN_STATUS)[keyof typeof BANK_TXN_STATUS];
+export const BANK_TXN_STATUS_VALUES = values(BANK_TXN_STATUS);
+
+/** What a bank transaction was turned into: a personal entry, a room expense, or paying back a room share. */
+export const BANK_TXN_LINK_KINDS = { TRANSACTION: 'transaction', ROOM_EXPENSE: 'room_expense', ROOM_PAYMENT: 'room_payment' } as const;
+export type BankTxnLinkKind = (typeof BANK_TXN_LINK_KINDS)[keyof typeof BANK_TXN_LINK_KINDS];
+export const BANK_TXN_LINK_KIND_VALUES = values(BANK_TXN_LINK_KINDS);
+
 export const CATEGORY_OWNER_TYPES = { SYSTEM: 'system', USER: 'user', ROOM: 'room' } as const;
 export type CategoryOwnerType = (typeof CATEGORY_OWNER_TYPES)[keyof typeof CATEGORY_OWNER_TYPES];
 export const CATEGORY_OWNER_TYPE_VALUES = values(CATEGORY_OWNER_TYPES);

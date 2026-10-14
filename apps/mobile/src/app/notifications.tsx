@@ -70,13 +70,13 @@ export default function Notifications() {
         <FlatList
           data={items}
           keyExtractor={(n) => n._id}
-          contentContainerStyle={{ padding: spacing.lg, gap: spacing.sm }}
+          contentContainerStyle={{ flexGrow: 1, padding: spacing.lg, gap: spacing.sm }}
           showsVerticalScrollIndicator={false}
           onScroll={reveal.onScroll}
           scrollEventThrottle={reveal.scrollEventThrottle}
           refreshControl={<RefreshControl refreshing={list.isRefetching} onRefresh={() => void list.refetch()} tintColor={colors.primary} colors={[colors.primary]} />}
           onEndReached={() => list.hasNextPage && void list.fetchNextPage()}
-          ListEmptyComponent={<EmptyState icon="bell-outline" title="No notifications" message="Room activity and budget alerts show up here." />}
+          ListEmptyComponent={<EmptyState icon="bell-outline" title="Nothing is Here" message="You're all caught up." />}
           renderItem={({ item, index }) => (
             <Appear index={index}>
               <Card onPress={() => open(item)} style={[{ padding: spacing.md }, !item.readAt && { backgroundColor: colors.primaryMuted }]}>

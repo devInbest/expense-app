@@ -13,9 +13,9 @@ export default function TabsLayout() {
     <Tabs tabBar={(props) => <GlassTabBar {...props} />} screenOptions={{ headerShown: false }}>
       <Tabs.Screen name="index" options={tab('Home', 'home-variant')} />
       <Tabs.Screen name="transactions" options={tab('Activity', 'swap-vertical-bold')} />
+      <Tabs.Screen name="bank" options={tab('Bank', 'bank-transfer')} />
       <Tabs.Screen name="rooms" options={tab('Rooms', 'account-group')} />
       <Tabs.Screen name="insights" options={tab('Insights', 'chart-donut')} />
-      <Tabs.Screen name="profile" options={tab('Profile', 'account-circle')} />
     </Tabs>
   );
 }

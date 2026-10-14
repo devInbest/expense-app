@@ -84,7 +84,7 @@ export default function Recurring() {
           })
         ) : (
           <View style={{ flex: 1, justifyContent: 'center' }}>
-            <EmptyState icon="calendar-sync" title="No recurring transactions" />
+            <EmptyState icon="calendar-sync" title="Nothing is Here" message="No recurring transactions yet." />
           </View>
         )}
       </Screen>
