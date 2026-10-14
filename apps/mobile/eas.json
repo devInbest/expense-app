@@ -11,11 +11,11 @@
         "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "860242797335-dl7hedjitcqcsk9n0q7l4fla7ls3ccua.apps.googleusercontent.com"
       }
     },
-    "preview": {
+    "development": {
       "extends": "base",
       "developmentClient": true,
       "distribution": "internal",
-      "channel": "preview",
+      "channel": "development",
       "android": { "buildType": "apk" },
       "env": { "APP_VARIANT": "preview" }
     },
@@ -28,7 +28,7 @@
         "EXPO_PUBLIC_API_URL": "https://expense-api-uwo5.onrender.com/api/v1"
       }
     },
-    "production-apk": {
+    "preview": {
       "extends": "production",
       "distribution": "internal",
       "android": { "buildType": "apk" }
