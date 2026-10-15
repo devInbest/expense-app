@@ -1,28 +1,11 @@
 import { useMutation } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { useState } from 'react';
 import { Alert, Platform, Pressable, View } from 'react-native';
-import { isUpiNumber, upiIdSchema, type NotificationPrefs } from '@expense/shared';
+import { isUpiNumber, type NotificationPrefs } from '@expense/shared';
 import { ProfilePhoto } from '@/components/ProfilePhoto';
-import {
-  AppText,
-  Appear,
-  Button,
-  Card,
-  Divider,
-  ErrorText,
-  Field,
-  Glass,
-  Icon,
-  ListItem,
-  Screen,
-  Section,
-  Segmented,
-  Sheet,
-  ToggleRow,
-} from '@/components/ui';
+import { AppText, Appear, Button, Card, Divider, Glass, Icon, ListItem, Screen, Section, Segmented, ToggleRow } from '@/components/ui';
 import { useSyncStatus } from '@/hooks/data';
-import { api, errorMessage, showError } from '@/lib/api';
+import { api, showError } from '@/lib/api';
 import { useAuth, useUser } from '@/lib/auth';
 import { config } from '@/lib/config';
 import { timeAgo } from '@/lib/dates';
@@ -43,8 +26,6 @@ export default function Profile() {
   const { signOut, setUser } = useAuth();
   const sync = useSyncStatus();
   const themeMode = useThemeMode();
-  const [upiOpen, setUpiOpen] = useState(false);
-
   const updatePrefs = useMutation({
     mutationFn: (prefs: Partial<NotificationPrefs>) => api.me.update({ notificationPrefs: prefs }),
     onSuccess: setUser,
@@ -155,17 +136,13 @@ export default function Profile() {
 
       <Section title="Money">
         <Card>
-          <ListItem icon="qrcode" title="UPI ID" subtitle={!user.upiId ? 'Add so room members can pay you' : isUpiNumber(user.upiId) ? 'Change to a UPI ID so members can pay you directly' : user.upiId} onPress={() => setUpiOpen(true)} />
-          <Divider />
-          <ListItem icon="target" title="Budgets" onPress={() => router.push('/budgets')} />
+          <ListItem icon="qrcode" title="UPI ID" subtitle={!user.upiId ? 'Add so room members can pay you' : isUpiNumber(user.upiId) ? 'Change to a UPI ID so members can pay you directly' : user.upiId} onPress={() => router.push('/upi')} />
           <Divider />
           <ListItem icon="calendar-sync" title="Recurring" onPress={() => router.push('/recurring')} />
           <Divider />
           <ListItem icon="shape-outline" title="Categories" onPress={() => router.push('/categories')} />
           <Divider />
           <ListItem icon="file-export-outline" title="Report" onPress={() => router.push('/export')} />
-          <Divider />
-          <ListItem icon="trash-can-outline" title="Bin" onPress={() => router.push('/bin')} />
         </Card>
       </Section>
 
@@ -215,50 +192,6 @@ export default function Profile() {
       <AppText variant="caption" muted style={{ textAlign: 'center' }}>
         Version {config.appVersion} · {Platform.OS}
       </AppText>
-      <UpiSheet key={String(upiOpen)} visible={upiOpen} onClose={() => setUpiOpen(false)} />
     </Screen>
-  );
-}
-
-function UpiSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
-  const user = useUser();
-  const { setUser } = useAuth();
-  const [value, setValue] = useState(user.upiId ?? '');
-  const [error, setError] = useState<string | null>(null);
-
-  const save = useMutation({
-    mutationFn: (upiId: string) => api.me.update({ upiId }),
-    onSuccess: (updated) => {
-      setUser(updated);
-      onClose();
-    },
-    onError: (err) => setError(errorMessage(err)),
-  });
-
-  const submit = (next: string) => {
-    const parsed = upiIdSchema.safeParse(next);
-    if (next && !parsed.success) return setError(parsed.error.issues[0]?.message ?? 'Invalid UPI ID');
-    setError(null);
-    save.mutate(next);
-  };
-
-  return (
-    <Sheet visible={visible} title="UPI ID" onClose={onClose}>
-      <Field
-        label="UPI ID"
-        hint="Find it in your UPI app's profile. Room members can then pay you in one tap."
-        value={value}
-        onChangeText={setValue}
-        placeholder="9876543210@ybl"
-        autoCapitalize="none"
-        autoCorrect={false}
-        keyboardType="email-address"
-        maxLength={100}
-        autoFocus
-      />
-      <ErrorText>{error}</ErrorText>
-      <Button title="Save" loading={save.isPending && save.variables !== ''} onPress={() => submit(value.trim())} />
-      {user.upiId ? <Button title="Remove" variant="ghost" loading={save.isPending && save.variables === ''} onPress={() => submit('')} /> : null}
-    </Sheet>
   );
 }

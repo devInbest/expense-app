@@ -23,10 +23,11 @@ export const notify = async (input: NotifyInput): Promise<number> => {
   if (recipients.length === 0) return 0;
 
   const data = { type: input.type, ...(input.data ?? {}) };
-  await Notification.insertMany(
+  const docs = await Notification.insertMany(
     recipients.map((userId) => ({ userId, type: input.type, title: input.title, body: input.body, data })),
   );
-  await sendPush(recipients, { title: input.title, body: input.body, data });
+  const dataByUser = Object.fromEntries(docs.map((d) => [String(d.userId), { notificationId: String(d._id) }]));
+  await sendPush(recipients, { title: input.title, body: input.body, data, dataByUser });
   return recipients.length;
 };
 

@@ -8,21 +8,29 @@ export interface PushPayload {
   title: string;
   body: string;
   data?: Record<string, unknown>;
+  /** Extra data merged into `data` for each recipient, keyed by user id. */
+  dataByUser?: Record<string, Record<string, unknown>>;
 }
 
 /** Sends to every enabled device of the given users. Tokens Expo reports as dead are disabled. */
 export const sendPush = async (userIds: string[], payload: PushPayload): Promise<number> => {
   if (userIds.length === 0) return 0;
-  const devices = await Device.find({ userId: { $in: userIds }, enabled: true }).select('expoPushToken').lean();
-  const tokens = [...new Set(devices.map((d) => d.expoPushToken))].filter((t) => Expo.isExpoPushToken(t));
-  if (tokens.length === 0) return 0;
+  const devices = await Device.find({ userId: { $in: userIds }, enabled: true }).select('userId expoPushToken').lean();
+  const ownerByToken = new Map<string, string>();
+  for (const d of devices) {
+    if (Expo.isExpoPushToken(d.expoPushToken) && !ownerByToken.has(d.expoPushToken)) ownerByToken.set(d.expoPushToken, String(d.userId));
+  }
+  if (ownerByToken.size === 0) return 0;
 
-  const messages: ExpoPushMessage[] = tokens.map((to) => ({
+  const messages: ExpoPushMessage[] = [...ownerByToken].map(([to, userId]) => ({
     to,
     sound: 'default',
+    // Must match the channel the mobile app creates in registerForPush.
+    channelId: 'default',
+    priority: 'high',
     title: payload.title,
     body: payload.body,
-    data: payload.data,
+    data: { ...payload.data, ...payload.dataByUser?.[userId] },
   }));
 
   let sent = 0;

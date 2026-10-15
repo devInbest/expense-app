@@ -1,14 +1,22 @@
 import type { ExpoConfig } from 'expo/config';
 
-const variant = process.env.APP_VARIANT === 'production' ? 'production' : 'preview';
-const isProd = variant === 'production';
-const suffix = isProd ? '' : `.${variant}`;
+type Variant = 'development' | 'preview' | 'production';
+
+const variants: Record<Variant, { name: string; appId: string }> = {
+  development: { name: 'ExpenseHog(dev)', appId: 'com.expenseapp.dev' },
+  preview: { name: 'ExpenseHog(pre)', appId: 'com.expenseapp' },
+  production: { name: 'ExpenseHog', appId: 'com.expenseapp' },
+};
+
+const envVariant = process.env.APP_VARIANT as Variant | undefined;
+const variant: Variant = envVariant && envVariant in variants ? envVariant : 'development';
+const { name, appId } = variants[variant];
 
 const googleIosUrlScheme = process.env.GOOGLE_IOS_URL_SCHEME;
 const easProjectId = process.env.EAS_PROJECT_ID || 'f63a4900-0a5a-474a-a434-db2f96f2bc71';
 
 const config: ExpoConfig = {
-  name: isProd ? 'expenseHog' : `expenseHog (${variant})`,
+  name,
   slug: 'expense-app',
   owner: 'ash.0167',
   version: '1.0.0',
@@ -18,7 +26,7 @@ const config: ExpoConfig = {
   userInterfaceStyle: 'automatic',
   runtimeVersion: { policy: 'appVersion' },
   ios: {
-    bundleIdentifier: `com.expenseapp${suffix}`,
+    bundleIdentifier: appId,
     supportsTablet: false,
     infoPlist: {
       NSPhotoLibraryUsageDescription: 'Attach receipt photos to your expenses.',
@@ -28,7 +36,8 @@ const config: ExpoConfig = {
     },
   },
   android: {
-    package: `com.expenseapp${suffix}`,
+    package: appId,
+    googleServicesFile: process.env.GOOGLE_SERVICES_JSON ?? './google-services.json',
     adaptiveIcon: {
       backgroundColor: '#141414',
       foregroundImage: './assets/images/android-icon-foreground.png',
@@ -56,13 +65,14 @@ const config: ExpoConfig = {
     [
       'expo-splash-screen',
       {
+        // Blank on purpose: the branded logo is drawn by BrandSplash, so the native splash is plain brand colour.
         backgroundColor: '#FF4F0F',
-        image: './assets/images/splash-icon.png',
+        image: './assets/images/splash-blank.png',
         imageWidth: 240,
         resizeMode: 'contain',
         dark: {
           backgroundColor: '#FF4F0F',
-          image: './assets/images/splash-icon.png',
+          image: './assets/images/splash-blank.png',
         },
       },
     ],
@@ -71,7 +81,7 @@ const config: ExpoConfig = {
     'expo-localization',
     'expo-sharing',
     '@react-native-community/datetimepicker',
-    ['expo-notifications', { color: '#FF4F0F' }],
+    ['expo-notifications', { icon: './assets/images/android-icon-monochrome.png', color: '#FF4F0F' }],
     ['expo-image-picker', { photosPermission: 'Attach receipt photos to your expenses.' }],
     googleIosUrlScheme
       ? ['@react-native-google-signin/google-signin', { iosUrlScheme: googleIosUrlScheme }]

@@ -45,6 +45,12 @@ export const detectInstalledApps = async (): Promise<Record<string, string>> => 
   return Object.fromEntries(found.filter((entry) => entry !== null));
 };
 
+/**
+ * A UPI pay link (the format inside UPI QR codes). With no amount, the payer enters one in their app.
+ * `pa` stays unescaped: some UPI apps don't decode `%40`, and `upiIdSchema` only allows URL-safe characters.
+ */
+export const upiPayLink = (upiId: string, payeeName: string) => `upi://pay?pa=${upiId}&pn=${encodeURIComponent(payeeName)}&cu=INR`;
+
 const LAST_UPI_KEY = 'pref.upiId';
 
 export const loadLastUpiId = async () => (Platform.OS === 'web' ? null : SecureStore.getItemAsync(LAST_UPI_KEY).catch(() => null));

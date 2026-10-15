@@ -290,7 +290,27 @@ export const createTransaction = async (input: TransactionInput) => {
   return clientId;
 };
 
-/** Saved transactions can't be edited or deleted; moving to and from the bin is the only change. */
+export const updateTransaction = async (clientId: string, input: TransactionInput) => {
+  await db.runAsync(
+    `UPDATE transactions SET type = ?, amount = ?, currency = ?, category_id = ?, note = ?, payment_method = ?,
+      occurred_at = ?, receipt_url = ?, tags = ?, dirty = 1, sync_error = NULL, client_updated_at = ?
+     WHERE client_id = ?`,
+    input.type,
+    input.amount,
+    input.currency,
+    input.categoryId,
+    input.note,
+    input.paymentMethod,
+    input.occurredAt,
+    input.receiptUrl ?? null,
+    JSON.stringify(input.tags ?? []),
+    new Date().toISOString(),
+    clientId,
+  );
+  afterWrite();
+};
+
+/** Saved transactions can't be deleted; moving them to the bin hides them from totals instead. */
 export const setTransactionBinned = async (clientId: string, binned: boolean) => {
   await db.runAsync(
     'UPDATE transactions SET binned = ?, dirty = 1, sync_error = NULL, client_updated_at = ? WHERE client_id = ?',

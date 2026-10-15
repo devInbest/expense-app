@@ -85,16 +85,37 @@ export const createTransaction = async (user: UserDoc, input: CreateInput, req?:
   }
 };
 
-const lockedError = (what: 'edited' | 'deleted') =>
-  ApiError.forbidden(`Transactions can’t be ${what} once saved. Move it to the bin instead.`, ERROR_CODES.TRANSACTION_LOCKED);
+const lockedError = () =>
+  ApiError.forbidden('Transactions can’t be deleted once saved. Move it to the bin instead.', ERROR_CODES.TRANSACTION_LOCKED);
 
-/** Saved transactions are immutable; the only change allowed is moving them to and from the bin. */
-export const updateTransaction = async (_user: UserDoc, _id: string, _input: UpdateInput, _req: Request) => {
-  throw lockedError('edited');
+type TransactionDoc = InstanceType<typeof Transaction>;
+
+/** Copies the edited fields onto the doc. Returns true when anything actually changed. */
+const applyEdits = async (user: UserDoc, t: TransactionDoc, input: UpdateInput) => {
+  const { receiptUrl, ...fields } = input;
+  if (fields.categoryId && fields.categoryId !== String(t.categoryId)) await assertCategoryUsable(user._id, fields.categoryId);
+  t.set(Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined)));
+  if (receiptUrl !== undefined) t.receiptUrl = receiptUrl || undefined;
+  return t.isModified();
+};
+
+export const updateTransaction = async (user: UserDoc, id: string, input: UpdateInput, req: Request) => {
+  if (!mongoose.isValidObjectId(id)) throw ApiError.notFound('Transaction not found');
+  const t = await Transaction.findOne({ _id: id, userId: user._id, deletedAt: null });
+  if (!t) throw ApiError.notFound('Transaction not found');
+  const wasExpense = t.type === 'expense';
+  if (await applyEdits(user, t, input)) {
+    t.version += 1;
+    t.clientUpdatedAt = new Date();
+    await t.save();
+    logActivity({ actorType: 'user', actorId: user._id, action: 'transaction.updated', entity: 'transaction', entityId: t._id, req });
+    if (wasExpense || t.type === 'expense') alertLater(user._id);
+  }
+  return toTransactionDTO(t.toObject());
 };
 
 export const deleteTransaction = async (_user: UserDoc, _id: string, _req: Request) => {
-  throw lockedError('deleted');
+  throw lockedError();
 };
 
 export const setBinned = async (user: UserDoc, id: string, binned: boolean, req: Request) => {
@@ -132,7 +153,7 @@ export const pushChanges = async (user: UserDoc, changes: SyncChange[], req: Req
         continue;
       }
 
-      if (change.deleted) throw lockedError('deleted');
+      if (change.deleted) throw lockedError();
 
       if (!existing) {
         const parsed = createTransactionSchema.safeParse({ ...change.data, clientId: change.clientId });
@@ -151,13 +172,24 @@ export const pushChanges = async (user: UserDoc, changes: SyncChange[], req: Req
         continue;
       }
 
-      // Existing rows are immutable: any `data` is ignored and only the bin flag can change.
-      if (change.binned !== undefined && Boolean(existing.binnedAt) !== change.binned && !existing.deletedAt) {
-        existing.binnedAt = change.binned ? change.clientUpdatedAt : null;
-        existing.version += 1;
-        existing.clientUpdatedAt = change.clientUpdatedAt;
-        await existing.save();
-        touchedExpenses ||= existing.type === 'expense';
+      if (!existing.deletedAt) {
+        const wasExpense = existing.type === 'expense';
+        let changed = false;
+        if (change.data) {
+          const parsed = updateTransactionSchema.safeParse(change.data);
+          if (!parsed.success) throw ApiError.badRequest(parsed.error.issues[0]?.message ?? 'Invalid transaction');
+          changed = await applyEdits(user, existing, parsed.data);
+        }
+        if (change.binned !== undefined && Boolean(existing.binnedAt) !== change.binned) {
+          existing.binnedAt = change.binned ? change.clientUpdatedAt : null;
+          changed = true;
+        }
+        if (changed) {
+          existing.version += 1;
+          existing.clientUpdatedAt = change.clientUpdatedAt;
+          await existing.save();
+          touchedExpenses ||= wasExpense || existing.type === 'expense';
+        }
       }
       results.push({ clientId: change.clientId, status: 'applied', transaction: toTransactionDTO(existing.toObject()) });
     } catch (err) {

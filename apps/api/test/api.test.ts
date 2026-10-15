@@ -109,7 +109,7 @@ describe('personal tracking', () => {
     expect(insights.body.data.totalExpense).toBe(34900);
   });
 
-  it('locks saved transactions and only allows moving them to and from the bin', async () => {
+  it('lets saved transactions be edited or binned, but never deleted', async () => {
     const user = await signUp(app, 'Binner');
     const cats = await request(app).get(api('/categories')).set(user.auth).expect(200);
     const food = cats.body.data.find((c: { key: string }) => c.key === 'food');
@@ -120,7 +120,9 @@ describe('personal tracking', () => {
       .expect(201);
     const url = api(`/transactions/${t.body.data._id}`);
 
-    await request(app).patch(url).set(user.auth).send({ note: 'edit' }).expect(403);
+    const edited = await request(app).patch(url).set(user.auth).send({ note: 'edit', amount: 6000 }).expect(200);
+    expect(edited.body.data).toMatchObject({ note: 'edit', amount: 6000, type: 'expense', version: 2 });
+    await request(app).patch(url).set(user.auth).send({ amount: 0 }).expect(400);
     await request(app).delete(url).set(user.auth).expect(403);
 
     const later = (ms: number) => new Date(Date.now() + ms).toISOString();
@@ -137,7 +139,7 @@ describe('personal tracking', () => {
       .send({ changes: [{ clientId: 'bin-client-0001', clientUpdatedAt: later(2000), binned: true, data: { amount: 1 } }] })
       .expect(200);
     expect(binned.body.data.results[0].transaction.binnedAt).toBeTruthy();
-    expect(binned.body.data.results[0].transaction.amount).toBe(5000);
+    expect(binned.body.data.results[0].transaction.amount).toBe(1);
     const list = await request(app).get(api('/transactions')).set(user.auth).expect(200);
     expect(list.body.data.items).toHaveLength(0);
 

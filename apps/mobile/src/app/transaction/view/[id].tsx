@@ -157,7 +157,17 @@ export default function TransactionView() {
         {tx.binned ? (
           <Button title="Restore transaction" icon="restore" onPress={() => void restore()} />
         ) : (
-          <Button title="Move to bin" icon="trash-can-outline" variant="glass" color={colors.danger} onPress={moveToBin} />
+          <Row style={{ gap: spacing.sm }}>
+            <Button
+              title="Edit"
+              icon="pencil-outline"
+              variant="glass"
+              color={colors.primary}
+              style={{ flex: 1 }}
+              onPress={() => router.push({ pathname: '/transaction/[id]', params: { id } })}
+            />
+            <Button title="Move to bin" icon="trash-can-outline" variant="glass" color={colors.danger} style={{ flex: 1 }} onPress={moveToBin} />
+          </Row>
         )}
       </SafeAreaView>
     </View>

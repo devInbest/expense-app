@@ -2,44 +2,51 @@ import { Image } from 'expo-image';
 import { Redirect, router, Stack, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { ActionSheetIOS, Alert, Platform, View } from 'react-native';
-import { PAYMENT_METHOD_VALUES, toMinor, type PaymentMethod, type TransactionType, LIMITS } from '@expense/shared';
+import { fromMinor, PAYMENT_METHOD_VALUES, toMinor, type PaymentMethod, type TransactionType, LIMITS } from '@expense/shared';
 import { AmountInput, CategoryGrid, DateField } from '@/components/finance';
-import { Appear, Button, Chip, ErrorText, Field, Glass, Row, Screen, Section, Segmented } from '@/components/ui';
-import { useCategories } from '@/hooks/data';
+import { Appear, Button, Chip, ErrorText, Field, Glass, Loading, Row, Screen, Section, Segmented } from '@/components/ui';
+import { useCategories, useLocalQuery } from '@/hooks/data';
 import { trackFeature } from '@/lib/analytics';
 import { errorMessage, isOffline } from '@/lib/api';
 import { useUser } from '@/lib/auth';
-import { createTransaction } from '@/lib/transactions';
+import { createTransaction, getTransaction, updateTransaction, type LocalTransaction } from '@/lib/transactions';
 import { pickAndUploadImage } from '@/lib/uploads';
 import { radius, spacing } from '@/theme';
 
 const METHOD_LABEL: Record<PaymentMethod, string> = { cash: 'Cash', upi: 'UPI', card: 'Card', bank: 'Bank', other: 'Other' };
 const METHOD_ICON: Record<PaymentMethod, string> = { cash: 'cash', upi: 'qrcode-scan', card: 'credit-card-outline', bank: 'bank-outline', other: 'wallet-outline' };
 
-/** Add-only: saved transactions are read-only and open in the details page instead. */
+/** `new` adds a transaction; any other id edits that saved transaction. */
 export default function TransactionForm() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  if (id !== 'new') return <Redirect href={{ pathname: '/transaction/view/[id]', params: { id } }} />;
-  return <NewTransactionForm />;
+  if (id === 'new') return <TransactionFormBody />;
+  return <EditTransactionForm id={id} />;
 }
 
-function NewTransactionForm() {
+function EditTransactionForm({ id }: { id: string }) {
+  const { data: tx } = useLocalQuery(() => getTransaction(id), [id]);
+  if (tx === undefined) return <Loading />;
+  if (!tx || tx.binned) return <Redirect href={{ pathname: '/transaction/view/[id]', params: { id } }} />;
+  return <TransactionFormBody existing={tx} />;
+}
+
+function TransactionFormBody({ existing }: { existing?: LocalTransaction }) {
   const user = useUser();
   const { categories } = useCategories();
 
-  const [type, setType] = useState<TransactionType>('expense');
+  const [type, setType] = useState<TransactionType>(existing?.type ?? 'expense');
   const [maxDate] = useState(() => new Date(Date.now() + 86_400_000));
-  const [amount, setAmount] = useState('');
-  const [categoryId, setCategoryId] = useState<string | undefined>();
-  const [note, setNote] = useState('');
-  const [method, setMethod] = useState<PaymentMethod>('upi');
-  const [date, setDate] = useState(new Date());
-  const [receiptUrl, setReceiptUrl] = useState<string | null>(null);
+  const [amount, setAmount] = useState(existing ? String(fromMinor(existing.amount, existing.currency)) : '');
+  const [categoryId, setCategoryId] = useState<string | undefined>(existing?.categoryId);
+  const [note, setNote] = useState(existing?.note ?? '');
+  const [method, setMethod] = useState<PaymentMethod>(existing?.paymentMethod ?? 'upi');
+  const [date, setDate] = useState(() => (existing ? new Date(existing.occurredAt) : new Date()));
+  const [receiptUrl, setReceiptUrl] = useState<string | null>(existing?.receiptUrl ?? null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const currency = user.defaultCurrency;
+  const currency = existing?.currency ?? user.defaultCurrency;
   const visibleCategories = useMemo(() => categories.filter((c) => c.type === type), [categories, type]);
 
   const save = async () => {
@@ -49,7 +56,7 @@ function NewTransactionForm() {
     if (!categoryId) return setError('Pick a category');
     setSaving(true);
     try {
-      await createTransaction({
+      const input = {
         type,
         amount: minor,
         currency,
@@ -58,9 +65,15 @@ function NewTransactionForm() {
         paymentMethod: method,
         occurredAt: date.toISOString(),
         receiptUrl,
-        tags: [],
-      });
-      trackFeature('transaction_add');
+        tags: existing?.tags ?? [],
+      };
+      if (existing) {
+        await updateTransaction(existing.clientId, input);
+        trackFeature('transaction_edit');
+      } else {
+        await createTransaction(input);
+        trackFeature('transaction_add');
+      }
       router.back();
     } catch (err) {
       setError(errorMessage(err));
@@ -104,7 +117,7 @@ function NewTransactionForm() {
 
   return (
     <Screen edges={['bottom']} contentStyle={{ paddingBottom: spacing.lg }}>
-      <Stack.Screen options={{ title: 'Add transaction' }} />
+      <Stack.Screen options={{ title: existing ? 'Edit transaction' : 'Add transaction' }} />
       <Appear>
         <Glass blur style={{ padding: spacing.md, gap: spacing.xs }} rounded={radius.xl}>
           <Segmented
@@ -119,7 +132,7 @@ function NewTransactionForm() {
               setCategoryId(undefined);
             }}
           />
-          <AmountInput value={amount} onChange={setAmount} currency={currency} autoFocus />
+          <AmountInput value={amount} onChange={setAmount} currency={currency} autoFocus={!existing} />
         </Glass>
       </Appear>
 
@@ -154,7 +167,7 @@ function NewTransactionForm() {
             )}
           </Section>
           <ErrorText>{error}</ErrorText>
-          <Button title="Save" icon="check" onPress={save} loading={saving} />
+          <Button title={existing ? 'Save changes' : 'Save'} icon="check" onPress={save} loading={saving} />
         </View>
       </Appear>
     </Screen>

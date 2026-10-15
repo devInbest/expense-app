@@ -101,6 +101,7 @@ function AppNavigator({ signedIn, onboarded }: { signedIn: boolean; onboarded: b
           <Stack.Protected guard={onboarded}>
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen name="profile" options={{ title: 'Profile' }} />
+            <Stack.Screen name="upi" options={{ title: 'UPI ID' }} />
             <Stack.Screen name="transaction/[id]" options={{ presentation: 'modal', title: 'Transaction' }} />
             <Stack.Screen name="transaction/view/[id]" options={{ title: 'Transaction' }} />
             <Stack.Screen name="bin" options={{ title: 'Bin' }} />
@@ -108,6 +109,7 @@ function AppNavigator({ signedIn, onboarded }: { signedIn: boolean; onboarded: b
             <Stack.Screen name="categories" options={{ title: 'Categories' }} />
             <Stack.Screen name="recurring" options={{ title: 'Recurring' }} />
             <Stack.Screen name="notifications" options={{ title: 'Notifications' }} />
+            <Stack.Screen name="notification/[id]" options={{ title: 'Notification' }} />
             <Stack.Screen name="invites" options={{ title: 'Room invites' }} />
             <Stack.Screen name="sessions" options={{ title: 'Devices' }} />
             <Stack.Screen name="account" options={{ title: 'Account' }} />

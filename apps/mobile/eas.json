@@ -17,7 +17,7 @@
       "distribution": "internal",
       "channel": "development",
       "android": { "buildType": "apk" },
-      "env": { "APP_VARIANT": "preview" }
+      "env": { "APP_VARIANT": "development" }
     },
     "production": {
       "extends": "base",
@@ -31,7 +31,9 @@
     "preview": {
       "extends": "production",
       "distribution": "internal",
-      "android": { "buildType": "apk" }
+      "channel": "preview",
+      "android": { "buildType": "apk" },
+      "env": { "APP_VARIANT": "preview" }
     }
   },
   "submit": {

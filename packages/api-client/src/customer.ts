@@ -208,6 +208,7 @@ export const createCustomerApi = (http: AxiosInstance) => {
 
     notifications: {
       list: (cursor?: string) => get<CursorPage<NotificationDTO> & { unread: number }>('/notifications', { cursor }),
+      get: (id: string) => get<NotificationDTO>(`/notifications/${id}`),
       markRead: (ids?: string[]) => post<null>('/notifications/read', { ids }),
     },
 

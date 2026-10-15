@@ -5,8 +5,12 @@ import { Platform } from 'react-native';
 import { api } from './api';
 import { config } from './config';
 import { getDeviceId } from './secure';
+import { colors } from '@/theme';
 
 type NotificationsModule = typeof import('expo-notifications');
+
+/** Must match the `channelId` the API sends pushes with. */
+const PUSH_CHANNEL_ID = 'default';
 
 let mod: NotificationsModule | null | undefined;
 
@@ -43,9 +47,13 @@ export const registerForPush = async (): Promise<string | null> => {
   if (!Notifications || !Device.isDevice || !config.easProjectId) return null;
   try {
     if (Platform.OS === 'android') {
-      await Notifications.setNotificationChannelAsync('default', {
+      await Notifications.setNotificationChannelAsync(PUSH_CHANNEL_ID, {
         name: 'Default',
-        importance: Notifications.AndroidImportance.DEFAULT,
+        importance: Notifications.AndroidImportance.HIGH,
+        lightColor: colors.light.primary,
+        enableLights: true,
+        vibrationPattern: [0, 200, 120, 200],
+        lockscreenVisibility: Notifications.AndroidNotificationVisibility.PRIVATE,
       });
     }
     let { status } = await Notifications.getPermissionsAsync();
@@ -69,8 +77,10 @@ export const unregisterPush = async () => {
   }
 };
 
-/** Where a tapped notification should take the user. */
+/** Where a tapped push notification should take the user. */
 export const hrefForNotification = (data: Record<string, unknown> | undefined): Href => {
+  if (typeof data?.notificationId === 'string') return { pathname: '/notification/[id]', params: { id: data.notificationId } };
+  // Pushes sent before notificationId was included.
   if (data?.inviteId) return '/invites';
   if (typeof data?.roomId === 'string') return { pathname: '/room/[id]', params: { id: data.roomId } };
   if (data?.recurringId) return '/recurring';
