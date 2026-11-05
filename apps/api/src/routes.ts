@@ -1,8 +1,11 @@
+import { timingSafeEqual } from 'node:crypto';
 import { Router } from 'express';
 import { asyncHandler } from './core/asyncHandler';
+import { ApiError } from './core/ApiError';
 import { ok } from './core/ApiResponse';
 import { appGate, requireOnboarded, requireUser } from './core/auth';
 import { writeLimiter } from './core/rateLimits';
+import { runAllJobs } from './jobs';
 import authRoutes from './modules/auth/auth.routes';
 import meRoutes from './modules/users/me.routes';
 import usersRoutes from './modules/users/users.routes';
@@ -24,9 +27,27 @@ import { getAppSettings } from './modules/settings/appSetting.service';
 
 const router = Router();
 
+const cronAuthorized = (authorization: string | undefined) => {
+  const secret = process.env.CRON_SECRET;
+  if (!secret || !authorization?.startsWith('Bearer ')) return false;
+  const provided = Buffer.from(authorization.slice('Bearer '.length));
+  const expected = Buffer.from(secret);
+  return provided.length === expected.length && timingSafeEqual(provided, expected);
+};
+
 router.get('/health', (_req, res) => {
   ok(res, { status: 'ok', timestamp: new Date().toISOString() }, 'Expense API is running');
 });
+
+// Vercel Cron calls this every 15 minutes with Authorization: Bearer CRON_SECRET.
+router.get(
+  '/cron',
+  asyncHandler(async (req, res) => {
+    if (!cronAuthorized(req.headers.authorization)) throw ApiError.unauthorized();
+    await runAllJobs();
+    ok(res, { ran: true });
+  }),
+);
 
 // Public: the admin login page and the app's splash screen read theme / min version before sign-in.
 router.get('/app-settings', asyncHandler(async (_req, res) => ok(res, await getAppSettings())));

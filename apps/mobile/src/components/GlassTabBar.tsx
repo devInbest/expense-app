@@ -68,7 +68,7 @@ function TabItem({
 }
 
 /** Solid pill tab bar on an opaque strip, so scrolled content never shows through; screens pad with `useTabBarInset`. */
-export function GlassTabBar({ state, descriptors, navigation, insets }: BottomTabBarProps) {
+export function GlassTabBar({ state, descriptors, emitter, navigateToTab, insets }: BottomTabBarProps) {
   const { colors, dark } = useTheme();
   const [width, setWidth] = useState(0);
   const segment = width > 0 ? (width - PAD * 2) / state.routes.length : 0;
@@ -133,13 +133,13 @@ export function GlassTabBar({ state, descriptors, navigation, insets }: BottomTa
               icon={(color) => options.tabBarIcon?.({ focused, color, size: 22 })}
               badge={options.tabBarBadge}
               onPress={() => {
-                const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+                const event = emitter.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
                 if (!focused && !event.defaultPrevented) {
                   void Haptics.selectionAsync();
-                  navigation.navigate(route.name, route.params);
+                  navigateToTab(route.key);
                 }
               }}
-              onLongPress={() => navigation.emit({ type: 'tabLongPress', target: route.key })}
+              onLongPress={() => emitter.emit({ type: 'tabLongPress', target: route.key })}
             />
           );
         })}

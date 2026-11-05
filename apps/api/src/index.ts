@@ -1,12 +1,16 @@
-import { createApp } from './app';
+import app from './app';
 import { env } from './config/env';
-import { connectDatabase, disconnectDatabase } from './config/database';
-import { bootstrap } from './seed/bootstrap';
+import { disconnectDatabase } from './config/database';
+import { ensureReady } from './config/ready';
 
 const start = async () => {
-  await connectDatabase();
-  await bootstrap();
-  const server = createApp().listen(env.port, '0.0.0.0', () => {
+  try {
+    await ensureReady();
+  } catch (error) {
+    console.error(error);
+    process.exit(1);
+  }
+  const server = app.listen(env.port, '0.0.0.0', () => {
     console.log(`Expense API running on port ${env.port} [${env.nodeEnv}]`);
   });
 

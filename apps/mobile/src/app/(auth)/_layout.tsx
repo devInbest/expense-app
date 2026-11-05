@@ -2,11 +2,14 @@ import { Stack } from 'expo-router';
 import { StackHeader } from '@/components/StackHeader';
 import { useTheme } from '@/theme';
 
+export const unstable_settings = {
+  anchor: 'welcome',
+};
+
 export default function AuthLayout() {
   const { colors } = useTheme();
   return (
     <Stack
-      initialRouteName="welcome"
       screenOptions={{
         header: (props) => <StackHeader {...props} />,
         headerTitle: '',

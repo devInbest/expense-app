@@ -57,7 +57,7 @@ export default function Bin() {
           onScroll={reveal.onScroll}
           scrollEventThrottle={reveal.scrollEventThrottle}
           stickySectionHeadersEnabled={false}
-          ListHeaderComponent={showInfo ? <Banner text="Binned transactions aren’t counted in your totals. Restore one to bring it back." /> : null}
+          ListHeaderComponent={showInfo ? <Banner text="Binned transactions aren’t counted in your totals. Restore one to bring it back." /> : undefined}
           renderSectionHeader={({ section }) => (
             <Appear>
               <AppText variant="label" muted style={{ paddingTop: spacing.md, paddingHorizontal: spacing.xs }}>

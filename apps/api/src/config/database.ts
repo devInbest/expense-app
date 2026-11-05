@@ -16,16 +16,18 @@ const connectionOptions: mongoose.ConnectOptions = {
 };
 
 export const connectDatabase = async (uri = env.mongodbUri): Promise<void> => {
+  if (mongoose.connection.readyState === 1) return;
   if (!uri) {
-    console.error('MongoDB connection error: MONGODB_URI is not set.');
-    process.exit(1);
+    const message = 'MongoDB connection error: MONGODB_URI is not set.';
+    console.error(message);
+    throw new Error(message);
   }
   try {
     await mongoose.connect(uri, connectionOptions);
     console.log(`MongoDB connected (database: ${mongoose.connection.name})`);
   } catch (error) {
     console.error(`MongoDB connection error: ${(error as Error).message}\n\n${ATLAS_CHECKLIST}`);
-    process.exit(1);
+    throw error;
   }
 };
 

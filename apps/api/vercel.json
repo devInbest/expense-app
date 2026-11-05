@@ -1,0 +1,9 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "src/app.ts": {
+      "includeFiles": "../../node_modules/pdfkit/js/data/**"
+    }
+  },
+  "crons": [{ "path": "/api/v1/cron", "schedule": "*/15 * * * *" }]
+}

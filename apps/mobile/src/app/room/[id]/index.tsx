@@ -212,7 +212,7 @@ export default function RoomScreen() {
         ) : (
           <FlatList
             data={[]}
-            renderItem={null}
+            renderItem={() => null}
             contentContainerStyle={{ flexGrow: 1, padding: spacing.lg, paddingBottom: listBottom }}
             showsVerticalScrollIndicator={false}
             onScroll={reveal.onScroll}
