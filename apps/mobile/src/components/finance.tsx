@@ -1,13 +1,13 @@
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useState, type ReactNode } from 'react';
-import { FlatList, Modal, Platform, Pressable, TextInput, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { FlatList, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { useSafeAreaFrame } from 'react-native-safe-area-context';
 import { formatMoney, getCurrency, type CategoryDTO, type RoomSpendingItemDTO, type TransactionType } from '@expense/shared';
 import { UNKNOWN_CATEGORY } from '@/hooks/data';
 import { formatDate, formatTime } from '@/lib/dates';
 import type { LocalTransaction } from '@/lib/transactions';
 import { radius, spacing, useTheme } from '@/theme';
-import { AppText, Backdrop, Button, CategoryIcon, Field, Icon, Row, SheetHeader, useFieldBoxStyle } from './ui';
+import { AppText, Button, CategoryIcon, Field, Icon, Row, SheetFrame, SheetHeader, useFieldBoxStyle } from './ui';
 
 export function Money({
   amount,
@@ -141,19 +141,10 @@ export function DateField({ label, value, onChange, maximumDate }: { label: stri
         />
       ) : null}
       {Platform.OS === 'ios' ? (
-        <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
-          <Pressable style={{ flex: 1, backgroundColor: colors.scrim, justifyContent: 'flex-end' }} onPress={() => setOpen(false)}>
-            <Pressable
-              style={{
-                backgroundColor: colors.glassStrong,
-                padding: spacing.lg,
-                paddingBottom: spacing.xxl,
-                gap: spacing.md,
-                borderTopLeftRadius: radius.xl,
-                borderTopRightRadius: radius.xl,
-                borderWidth: 1,
-                borderColor: colors.glassBorder,
-              }}>
+        <SheetFrame visible={open} onClose={() => setOpen(false)} dismissOnScrim>
+          <SheetHeader title={label} onClose={() => setOpen(false)} />
+          <View style={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.lg, gap: spacing.md }}>
+            <ScrollView style={{ maxHeight: 460 }} bounces={false}>
               <DateTimePicker
                 value={value}
                 mode="datetime"
@@ -163,10 +154,10 @@ export function DateField({ label, value, onChange, maximumDate }: { label: stri
                 maximumDate={maximumDate}
                 onChange={(_, d) => d && onChange(d)}
               />
-              <Button title="Done" onPress={() => setOpen(false)} />
-            </Pressable>
-          </Pressable>
-        </Modal>
+            </ScrollView>
+            <Button title="Done" onPress={() => setOpen(false)} />
+          </View>
+        </SheetFrame>
       ) : null}
     </View>
   );
@@ -198,63 +189,68 @@ export function SelectModal({
   searchable?: boolean;
 }) {
   const { colors } = useTheme();
+  const { height } = useSafeAreaFrame();
   const [q, setQ] = useState('');
   const filtered = q
     ? options.filter((o) => `${o.label} ${o.description ?? ''}`.toLowerCase().includes(q.toLowerCase()))
     : options;
+  const listHeight = Math.min(Math.max(filtered.length, 1) * 68 + spacing.md, height * 0.62);
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <View style={{ flex: 1 }}>
-        <Backdrop />
-        <SafeAreaView style={{ flex: 1 }}>
-          <SheetHeader title={title} onClose={onClose} />
-          {searchable ? (
-            <View style={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.md }}>
-              <Field placeholder="Search" value={q} onChangeText={setQ} autoCorrect={false} />
-            </View>
-          ) : null}
-          <FlatList
-            data={filtered}
-            keyExtractor={(o) => o.value}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.xs }}
-            renderItem={({ item }) => {
-              const selected = item.value === value;
-              return (
-                <Pressable
-                  onPress={() => {
-                    onSelect(item.value);
-                    onClose();
-                  }}
-                  style={({ pressed }) => ({
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: spacing.md,
-                    paddingVertical: spacing.md,
-                    paddingHorizontal: spacing.md,
-                    borderRadius: radius.md,
-                    backgroundColor: selected ? colors.primaryMuted : pressed ? colors.surfaceAlt : 'transparent',
-                  })}>
-                  {item.left}
-                  <View style={{ flex: 1 }}>
-                    <AppText style={{ fontWeight: selected ? '700' : '500' }} color={selected ? colors.primary : undefined}>
-                      {item.label}
-                    </AppText>
-                    {item.description ? (
-                      <AppText variant="caption" muted>
-                        {item.description}
-                      </AppText>
-                    ) : null}
-                  </View>
-                  {selected ? <Icon name="check-circle" color={colors.primary} /> : null}
-                </Pressable>
-              );
-            }}
-          />
-        </SafeAreaView>
-      </View>
-    </Modal>
+    <SheetFrame visible={visible} onClose={onClose} dismissOnScrim>
+      <SheetHeader title={title} onClose={onClose} />
+      {searchable ? (
+        <View style={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.md }}>
+          <Field placeholder="Search" value={q} onChangeText={setQ} autoCorrect={false} />
+        </View>
+      ) : null}
+      <FlatList
+        data={filtered}
+        keyExtractor={(o) => o.value}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        style={{ height: listHeight, flexGrow: 0 }}
+        contentContainerStyle={{ paddingHorizontal: spacing.md, paddingBottom: spacing.lg, gap: spacing.xs }}
+        ListEmptyComponent={
+          <AppText muted style={{ textAlign: 'center', padding: spacing.lg }}>
+            No matches
+          </AppText>
+        }
+        renderItem={({ item }) => {
+          const selected = item.value === value;
+          return (
+            <Pressable
+              onPress={() => {
+                onSelect(item.value);
+                onClose();
+              }}
+              style={({ pressed }) => ({
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: spacing.md,
+                paddingVertical: spacing.md,
+                paddingHorizontal: spacing.md,
+                borderRadius: radius.lg,
+                backgroundColor: selected ? colors.primaryMuted : pressed ? colors.surfaceAlt : 'transparent',
+                borderWidth: selected ? 1 : 0,
+                borderColor: selected ? colors.primary : 'transparent',
+              })}>
+              {item.left}
+              <View style={{ flex: 1 }}>
+                <AppText style={{ fontWeight: selected ? '700' : '500' }} color={selected ? colors.primary : undefined}>
+                  {item.label}
+                </AppText>
+                {item.description ? (
+                  <AppText variant="caption" muted>
+                    {item.description}
+                  </AppText>
+                ) : null}
+              </View>
+              {selected ? <Icon name="check-circle" color={colors.primary} /> : null}
+            </Pressable>
+          );
+        }}
+      />
+    </SheetFrame>
   );
 }
 

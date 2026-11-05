@@ -1,11 +1,12 @@
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, AppState, FlatList, Linking, Platform, RefreshControl, View } from 'react-native';
+import { AppState, FlatList, Linking, Platform, RefreshControl, View } from 'react-native';
+import { popup } from '@/components/popup';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { qk } from '@expense/api-client';
 import type { BankTxnStatus } from '@expense/shared';
-import { BankTxnRow } from '@/components/BankTxnRow';
+import { BankTxnRow, SwipeableBankTxnRow, SwipeableRestoreBankTxnRow } from '@/components/BankTxnRow';
 import { TabHeader } from '@/components/TabHeader';
 import { AppText, Appear, Backdrop, Banner, Button, Card, CategoryIcon, EmptyState, ErrorState, Loading, RevealScope, Row, Segmented, useRevealList, useTabBarInset } from '@/components/ui';
 import { trackFeature } from '@/lib/analytics';
@@ -76,17 +77,20 @@ export default function BankInbox() {
   const enable = async () => {
     const result = await requestSmsPermission();
     if (result === 'blocked') {
-      Alert.alert('SMS access is off', 'Allow SMS access for this app in Settings to import bank transactions.', [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Open settings', onPress: () => void Linking.openSettings() },
-      ]);
+      popup.confirm({
+        title: 'SMS access is off',
+        message: 'Allow SMS access for this app in Settings to import bank transactions.',
+        icon: 'message-text-lock-outline',
+        confirmLabel: 'Open settings',
+        onConfirm: () => void Linking.openSettings(),
+      });
       return;
     }
     if (result !== 'granted') return;
     trackFeature('bank_sms_enabled');
     await smsSetup.refetch();
     const added = await scan();
-    if (added === 0) Alert.alert('No bank transactions found', 'We looked at the last 60 days of SMS. New bank alerts will show up here as they arrive.');
+    if (added === 0) popup.alert('No bank transactions found', 'We looked at the last 60 days of SMS. New bank alerts will show up here as they arrive.', 'warning');
   };
 
   const items = list.data?.pages.flatMap((p) => p.items) ?? [];
@@ -163,23 +167,71 @@ export default function BankInbox() {
             renderItem={({ item, index }) => {
               const first = index === 0;
               const last = index === items.length - 1;
+              const open = () => router.push({ pathname: '/bank/[id]', params: { id: item._id } });
+              const corners = {
+                borderTopLeftRadius: first ? radius.lg : 0,
+                borderTopRightRadius: first ? radius.lg : 0,
+                borderBottomLeftRadius: last ? radius.lg : 0,
+                borderBottomRightRadius: last ? radius.lg : 0,
+              } as const;
+              const shell = {
+                paddingHorizontal: spacing.md,
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+                borderLeftWidth: 1,
+                borderRightWidth: 1,
+                borderTopWidth: first ? 1 : 0,
+                borderBottomWidth: last ? 1 : 0,
+              };
+
+              const dropFrom = (key: ReturnType<typeof qk.bankTransactions>) => {
+                queryClient.setQueriesData({ queryKey: key }, (old) => {
+                  if (!old || typeof old !== 'object' || !('pages' in old)) return old;
+                  const data = old as NonNullable<typeof list.data>;
+                  return {
+                    ...data,
+                    pages: data.pages.map((page) => ({
+                      ...page,
+                      items: page.items.filter((t) => t._id !== item._id),
+                      pending: key[2] === 'pending' ? Math.max(0, (page.pending ?? 1) - 1) : page.pending,
+                    })),
+                  };
+                });
+              };
+
+              const ignore = async () => {
+                dropFrom(qk.bankTransactions('pending'));
+                try {
+                  await api.bank.ignore(item._id);
+                  await queryClient.invalidateQueries({ queryKey: qk.bankAll });
+                } catch (err) {
+                  await queryClient.invalidateQueries({ queryKey: qk.bankAll });
+                  popup.error("Couldn't ignore", errorMessage(err));
+                }
+              };
+
+              const restore = async () => {
+                dropFrom(qk.bankTransactions('ignored'));
+                try {
+                  await api.bank.restore(item._id);
+                  await queryClient.invalidateQueries({ queryKey: qk.bankAll });
+                } catch (err) {
+                  await queryClient.invalidateQueries({ queryKey: qk.bankAll });
+                  popup.error("Couldn't restore", errorMessage(err));
+                }
+              };
+
               return (
-                <Appear
-                  index={index}
-                  style={{
-                    paddingHorizontal: spacing.md,
-                    backgroundColor: colors.glass,
-                    borderColor: colors.glassBorder,
-                    borderLeftWidth: 1,
-                    borderRightWidth: 1,
-                    borderTopWidth: first ? 1 : 0,
-                    borderBottomWidth: last ? 1 : 0,
-                    borderTopLeftRadius: first ? radius.lg : 0,
-                    borderTopRightRadius: first ? radius.lg : 0,
-                    borderBottomLeftRadius: last ? radius.lg : 0,
-                    borderBottomRightRadius: last ? radius.lg : 0,
-                  }}>
-                  <BankTxnRow item={item} onPress={() => router.push({ pathname: '/bank/[id]', params: { id: item._id } })} />
+                <Appear index={index}>
+                  {status === 'pending' ? (
+                    <SwipeableBankTxnRow item={item} onPress={open} onIgnore={ignore} shellStyle={shell} corners={corners} />
+                  ) : status === 'ignored' ? (
+                    <SwipeableRestoreBankTxnRow item={item} onPress={open} onRestore={restore} shellStyle={shell} corners={corners} />
+                  ) : (
+                    <View style={[shell, corners, { overflow: 'hidden' }]}>
+                      <BankTxnRow item={item} onPress={open} />
+                    </View>
+                  )}
                 </Appear>
               );
             }}

@@ -11,6 +11,7 @@ import { qk } from '@expense/api-client';
 import { compareVersions } from '@expense/shared';
 import { BrandSplash } from '@/components/BrandSplash';
 import { StackHeader } from '@/components/StackHeader';
+import { PopupHost } from '@/components/popup';
 import { AppText, Backdrop, Button, EmptyState } from '@/components/ui';
 import { useAppLifecycle, useBankSmsImport, useNotificationRouting, useScreenTracking } from '@/hooks/lifecycle';
 import { api } from '@/lib/api';
@@ -69,6 +70,7 @@ function RootNavigator() {
         <AppNavigator signedIn={signedIn} onboarded={onboarded} />
       )}
       <BrandSplash ready={status !== 'loading'} />
+      <PopupHost />
     </View>
   );
 }
@@ -90,6 +92,8 @@ function AppNavigator({ signedIn, onboarded }: { signedIn: boolean; onboarded: b
             header: (props) => <StackHeader {...props} />,
             contentStyle: { backgroundColor: colors.background },
           }}>
+          <Stack.Screen name="index" options={{ headerShown: false }} />
+
           <Stack.Protected guard={!signedIn}>
             <Stack.Screen name="(auth)" options={{ headerShown: false }} />
           </Stack.Protected>

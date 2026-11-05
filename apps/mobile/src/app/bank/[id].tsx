@@ -2,7 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Crypto from 'expo-crypto';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Alert, View } from 'react-native';
+import { View } from 'react-native';
+import { popup } from '@/components/popup';
 import { qk } from '@expense/api-client';
 import {
   formatMoney,
@@ -141,7 +142,7 @@ function PendingActions({ item }: { item: BankTransactionDTO }) {
       void queryClient.invalidateQueries({ queryKey: qk.bankAll });
       router.back();
     },
-    onError: (err) => Alert.alert("Couldn't ignore", errorMessage(err)),
+    onError: (err) => popup.error("Couldn't ignore", errorMessage(err)),
   });
 
   return (
@@ -336,7 +337,7 @@ function ShareCandidates({ item, roomId, onBack }: { item: BankTransactionDTO; r
       trackFeature('bank_txn_room_payment');
       afterSave(roomId);
     },
-    onError: (err) => Alert.alert("Couldn't save", errorMessage(err)),
+    onError: (err) => popup.error("Couldn't save", errorMessage(err)),
   });
 
   const label = (e: RoomExpenseDTO) => e.note || (e.categoryId ? (byId.get(e.categoryId) ?? UNKNOWN_CATEGORY).name : 'an expense');
@@ -347,10 +348,13 @@ function ShareCandidates({ item, roomId, onBack }: { item: BankTransactionDTO; r
       item.direction === 'debit'
         ? `Your ${amount} share of "${label(c.expense)}" will be marked paid, and ${r.name(c.expense.createdBy)} will be notified.`
         : `${r.name(c.userId)}'s ${amount} share of "${label(c.expense)}" will be marked paid.`;
-    Alert.alert('Mark as paid?', message, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Mark paid', onPress: () => link.mutate(c) },
-    ]);
+    popup.confirm({
+      title: 'Mark as paid?',
+      message,
+      icon: 'check-circle-outline',
+      confirmLabel: 'Mark paid',
+      onConfirm: () => link.mutate(c),
+    });
   };
 
   if (expenses.isLoading || !r.room) return <Loading />;
@@ -418,7 +422,7 @@ function IgnoredInfo({ item }: { item: BankTransactionDTO }) {
       queryClient.setQueryData(qk.bankTransaction(item._id), updated);
       void queryClient.invalidateQueries({ queryKey: qk.bankAll });
     },
-    onError: (err) => Alert.alert("Couldn't restore", errorMessage(err)),
+    onError: (err) => popup.error("Couldn't restore", errorMessage(err)),
   });
   return (
     <>

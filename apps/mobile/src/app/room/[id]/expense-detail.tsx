@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, View } from 'react-native';
+import { ActivityIndicator, Pressable, View } from 'react-native';
+import { popup } from '@/components/popup';
 import { qk } from '@expense/api-client';
 import { computeExpenseDebts, formatMoney, type PaymentMethod, type RoomExpenseDTO } from '@expense/shared';
 import { Money } from '@/components/finance';
@@ -42,7 +43,7 @@ export default function RoomExpenseDetail() {
       queryClient.setQueryData(qk.roomExpense(id, expenseId), updated);
       void queryClient.invalidateQueries({ queryKey: qk.room(id) });
     },
-    onError: (err) => Alert.alert('Could not update', errorMessage(err)),
+    onError: (err) => popup.error('Could not update', errorMessage(err)),
   });
   const remove = useMutation({
     mutationFn: () => api.rooms.removeExpense(id, expenseId),
@@ -52,7 +53,7 @@ export default function RoomExpenseDetail() {
       void queryClient.invalidateQueries({ queryKey: qk.roomSpendingAll });
       router.back();
     },
-    onError: (err) => Alert.alert("Couldn't delete", errorMessage(err)),
+    onError: (err) => popup.error("Couldn't delete", errorMessage(err)),
   });
   const e = expense.data;
   const owes = useMemo(() => {
@@ -79,14 +80,14 @@ export default function RoomExpenseDetail() {
   const payment = myOwed ? { upiId: payeeUpi, payeeName: r.name(e.createdBy), amount: myOwed, currency: room.currency } : null;
   const toggle = (userId: string, paid: boolean) => {
     if (paid) return mark.mutate({ userId, paid });
-    Alert.alert('Mark as unpaid?', `${r.name(userId)}'s payment for this expense will be removed.`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Mark unpaid',
-        style: 'destructive',
-        onPress: () => mark.mutate({ userId, paid }),
-      },
-    ]);
+    popup.confirm({
+      title: 'Mark as unpaid?',
+      message: `${r.name(userId)}'s payment for this expense will be removed.`,
+      icon: 'close-circle-outline',
+      confirmLabel: 'Mark unpaid',
+      destructive: true,
+      onConfirm: () => mark.mutate({ userId, paid }),
+    });
   };
 
   return (
@@ -185,10 +186,14 @@ export default function RoomExpenseDetail() {
                 variant="danger"
                 loading={remove.isPending}
                 onPress={() =>
-                  Alert.alert('Delete expense?', 'Balances will be recalculated for everyone.', [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Delete', style: 'destructive', onPress: () => remove.mutate() },
-                  ])
+                  popup.confirm({
+                    title: 'Delete expense?',
+                    message: 'Balances will be recalculated for everyone.',
+                    icon: 'trash-can-outline',
+                    confirmLabel: 'Delete',
+                    destructive: true,
+                    onConfirm: () => remove.mutate(),
+                  })
                 }
               />
             ) : null}

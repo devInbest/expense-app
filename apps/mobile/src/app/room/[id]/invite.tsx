@@ -2,7 +2,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Share } from 'react-native';
+import { Share } from 'react-native';
+import { popup } from '@/components/popup';
 import { qk } from '@expense/api-client';
 import { APP_SCHEME, buildInviteLink, phoneSchema, type PublicUserDTO } from '@expense/shared';
 import { AppText, Avatar, Banner, Button, Card, ErrorText, Field, ListItem, Loading, Row, Screen, Section } from '@/components/ui';
@@ -27,7 +28,7 @@ export default function Invite() {
     onSuccess: (_, body) => {
       trackFeature(`room_invite_${body.channel}`);
       void queryClient.invalidateQueries({ queryKey: qk.roomInvites(id) });
-      Alert.alert('Invite sent', body.channel === 'phone' ? "We've texted them a link to join." : "They'll see it in the app.");
+      popup.success('Invite sent', body.channel === 'phone' ? "We've texted them a link to join." : "They'll see it in the app.");
       setQuery('');
       setResults(null);
     },
@@ -91,7 +92,7 @@ export default function Invite() {
                 style={{ flex: 1 }}
                 onPress={() => {
                   void Clipboard.setStringAsync(code!);
-                  Alert.alert('Copied');
+                  popup.success('Copied');
                 }}
               />
             </Row>

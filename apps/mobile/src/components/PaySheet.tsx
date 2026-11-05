@@ -1,7 +1,8 @@
 import * as Clipboard from 'expo-clipboard';
 import { Image } from 'expo-image';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, View } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
+import { popup } from '@/components/popup';
 import { formatMoney } from '@expense/shared';
 import { detectInstalledApps, openUpiApp, UPI_APPS, type UpiApp } from '@/lib/upi';
 import { spacing, useTheme } from '@/theme';
@@ -37,7 +38,7 @@ export function PaySheet({ visible, onClose, payment }: { visible: boolean; onCl
       await openUpiApp(app);
       onClose();
     } catch {
-      Alert.alert(`Couldn't open ${app.name}`, 'Try another app.');
+      popup.error(`Couldn't open ${app.name}`, 'Try another app.');
     }
   };
 

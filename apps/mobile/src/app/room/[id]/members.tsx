@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Alert, View } from 'react-native';
+import { View } from 'react-native';
+import { popup } from '@/components/popup';
 import { ApiClientError, qk } from '@expense/api-client';
 import type { RoomMemberDTO } from '@expense/shared';
 import { AppText, Avatar, Button, Card, Divider, ErrorState, ListItem, Loading, Row, Screen, Section } from '@/components/ui';
@@ -57,12 +58,13 @@ export default function Members() {
     },
     onError: (err) => {
       if (err instanceof ApiClientError && err.code === 'UNSETTLED_BALANCE') {
-        Alert.alert(
+        popup.alert(
           'Settle up first',
           'You still owe or are owed money in this room. Each expense is settled when the person who added it marks the shares as paid.',
+          'warning',
         );
       } else if (err instanceof ApiClientError && err.code === 'OWNER_MUST_TRANSFER') {
-        Alert.alert('Transfer ownership first', 'Make someone else the owner before you leave, or archive the room.');
+        popup.alert('Transfer ownership first', 'Make someone else the owner before you leave, or archive the room.', 'warning');
       } else {
         showError(err);
       }
@@ -71,14 +73,11 @@ export default function Members() {
 
   const manage = (m: RoomMemberDTO) => {
     if (m.user._id === r.me || m.role === 'owner' || !r.isManager) return;
-    const actions: {
-      text: string;
-      style?: 'destructive' | 'cancel';
-      onPress?: () => void;
-    }[] = [];
+    const actions: { label: string; icon: string; role?: 'destructive'; onPress?: () => void }[] = [];
     if (r.role === 'owner') {
       actions.push({
-        text: m.role === 'admin' ? 'Make member' : 'Make admin',
+        label: m.role === 'admin' ? 'Make member' : 'Make admin',
+        icon: m.role === 'admin' ? 'account-outline' : 'shield-account-outline',
         onPress: () =>
           setRole.mutate({
             userId: m.user._id,
@@ -86,29 +85,33 @@ export default function Members() {
           }),
       });
       actions.push({
-        text: 'Make owner',
+        label: 'Make owner',
+        icon: 'crown-outline',
         onPress: () =>
-          Alert.alert(`Make ${m.user.name} the owner?`, 'You will become an admin.', [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Transfer', onPress: () => transfer.mutate(m.user._id) },
-          ]),
+          popup.confirm({
+            title: `Make ${m.user.name} the owner?`,
+            message: 'You will become an admin.',
+            icon: 'crown-outline',
+            confirmLabel: 'Transfer',
+            onConfirm: () => transfer.mutate(m.user._id),
+          }),
       });
     }
     actions.push({
-      text: 'Remove from room',
-      style: 'destructive',
+      label: 'Remove from room',
+      icon: 'account-remove-outline',
+      role: 'destructive',
       onPress: () =>
-        Alert.alert(`Remove ${m.user.name}?`, 'Their past expenses stay in the room history.', [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Remove',
-            style: 'destructive',
-            onPress: () => removeMember.mutate(m.user._id),
-          },
-        ]),
+        popup.confirm({
+          title: `Remove ${m.user.name}?`,
+          message: 'Their past expenses stay in the room history.',
+          icon: 'account-remove-outline',
+          confirmLabel: 'Remove',
+          destructive: true,
+          onConfirm: () => removeMember.mutate(m.user._id),
+        }),
     });
-    actions.push({ text: 'Cancel', style: 'cancel' });
-    Alert.alert(m.user.name, ROLE_LABEL[m.role], actions);
+    popup.menu({ title: m.user.name, message: ROLE_LABEL[m.role], actions });
   };
 
   if (r.isLoading) return <Loading />;
@@ -190,14 +193,14 @@ export default function Members() {
               style={{ flex: 1 }}
               loading={leave.isPending}
               onPress={() =>
-                Alert.alert('Leave this room?', "You'll lose access to its expenses.", [
-                  { text: 'Cancel', style: 'cancel' },
-                  {
-                    text: 'Leave',
-                    style: 'destructive',
-                    onPress: () => leave.mutate(),
-                  },
-                ])
+                popup.confirm({
+                  title: 'Leave this room?',
+                  message: "You'll lose access to its expenses.",
+                  icon: 'logout',
+                  confirmLabel: 'Leave',
+                  destructive: true,
+                  onConfirm: () => leave.mutate(),
+                })
               }
             />
           </Row>

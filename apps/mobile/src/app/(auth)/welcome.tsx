@@ -1,4 +1,3 @@
-import { router } from 'expo-router';
 import { useState } from 'react';
 import { Image } from 'expo-image';
 import { StatusBar } from 'expo-status-bar';
@@ -56,12 +55,13 @@ export default function Welcome() {
 
       <Animated.View entering={FadeInUp.delay(300).duration(500).easing(MOTION.easing)} style={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.lg }}>
         <Glass blur style={{ padding: spacing.lg, gap: spacing.md }} rounded={30}>
+          {/* Phone login temporarily disabled — Google only for now.
           <Button title="Continue with phone" icon="cellphone" disabled={!accepted} onPress={() => router.push('/phone')} />
+          */}
           {isGoogleConfigured() ? (
             <Button
               title="Continue with Google"
               icon={<Image source={require('../../../assets/images/google-g.png')} style={{ width: 20, height: 20 }} />}
-              variant="glass"
               disabled={!accepted}
               loading={googleLoading}
               onPress={continueWithGoogle}

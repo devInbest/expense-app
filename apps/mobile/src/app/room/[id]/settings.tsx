@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Alert } from 'react-native';
 import { qk } from '@expense/api-client';
+import { popup } from '@/components/popup';
 import { fromMinor, toMinor, type RoomSettings } from '@expense/shared';
 import { CurrencyField } from '@/components/CurrencyField';
 import { AmountInput } from '@/components/finance';
@@ -34,7 +34,7 @@ export default function RoomSettingsScreen() {
     mutationFn: (amount: number) => api.rooms.setBudget(id, { amount, period: 'monthly' }),
     onSuccess: () => {
       void invalidate();
-      Alert.alert('Budget saved');
+      popup.success('Budget saved');
     },
     onError: (err) => setError(errorMessage(err)),
   });
@@ -62,7 +62,7 @@ export default function RoomSettingsScreen() {
       try {
         const balances = await queryClient.fetchQuery({ queryKey: qk.roomBalances(id), queryFn: () => api.rooms.balances(id), staleTime: 0 });
         if (Object.values(balances.net).some((v) => v !== 0)) {
-          Alert.alert('Settle up first', 'Some expenses aren’t fully paid yet. Restore the room, mark every share as paid, then archive and delete it.');
+          popup.alert('Settle up first', 'Some expenses aren’t fully paid yet. Restore the room, mark every share as paid, then archive and delete it.', 'warning');
           return;
         }
       } catch (err) {
@@ -70,10 +70,14 @@ export default function RoomSettingsScreen() {
         return;
       }
     }
-    Alert.alert('Delete room?', 'All expenses, payments and members will be removed for everyone. This can’t be undone.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => remove.mutate() },
-    ]);
+    popup.confirm({
+      title: 'Delete room?',
+      message: 'All expenses, payments and members will be removed for everyone. This can’t be undone.',
+      icon: 'trash-can-outline',
+      confirmLabel: 'Delete',
+      destructive: true,
+      onConfirm: () => remove.mutate(),
+    });
   };
 
   if (!room) return <Loading />;
@@ -143,10 +147,14 @@ export default function RoomSettingsScreen() {
             onPress={() =>
               r.archived
                 ? archive.mutate(false)
-                : Alert.alert('Archive room?', 'It becomes read-only for everyone. You can restore it later.', [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Archive', style: 'destructive', onPress: () => archive.mutate(true) },
-                  ])
+                : popup.confirm({
+                    title: 'Archive room?',
+                    message: 'It becomes read-only for everyone. You can restore it later.',
+                    icon: 'archive-outline',
+                    confirmLabel: 'Archive',
+                    tone: 'warning',
+                    onConfirm: () => archive.mutate(true),
+                  })
             }
           />
           {r.archived ? <Button title="Delete room" variant="danger" loading={remove.isPending} onPress={() => void confirmDelete()} /> : null}

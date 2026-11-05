@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Alert, Pressable, View } from 'react-native';
+import { Pressable, View } from 'react-native';
+import { popup } from '@/components/popup';
 import { qk } from '@expense/api-client';
 import { createCategorySchema, type CategoryDTO, type TransactionType } from '@expense/shared';
 import { Button, Card, CategoryIcon, ErrorText, Field, Icon, ListItem, Loading, Screen, Section, Segmented, Sheet } from '@/components/ui';
@@ -33,10 +34,14 @@ export default function Categories() {
   });
 
   const confirmRemove = (c: CategoryDTO) =>
-    Alert.alert(`Delete "${c.name}"?`, 'Existing transactions will move to Uncategorized.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => remove.mutate(c) },
-    ]);
+    popup.confirm({
+      title: `Delete "${c.name}"?`,
+      message: 'Existing transactions will move to Uncategorized.',
+      icon: 'trash-can-outline',
+      confirmLabel: 'Delete',
+      destructive: true,
+      onConfirm: () => remove.mutate(c),
+    });
 
   if (isLoading) return <Loading />;
   const list = categories.filter((c) => c.type === type);

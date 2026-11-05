@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, View } from 'react-native';
+import { ActivityIndicator, Pressable, View } from 'react-native';
+import { popup } from '@/components/popup';
 import { Avatar, Icon } from '@/components/ui';
 import { trackFeature } from '@/lib/analytics';
 import { api, showError } from '@/lib/api';
@@ -39,14 +40,14 @@ export function ProfilePhoto({ size = 72 }: { size?: number }) {
   };
 
   const openMenu = () =>
-    Alert.alert('Profile photo', undefined, [
-      { text: 'Take photo', onPress: () => void upload('camera') },
-      { text: 'Choose from library', onPress: () => void upload('library') },
-      ...(user.avatarUrl
-        ? [{ text: 'Remove photo', style: 'destructive' as const, onPress: () => void save('') }]
-        : []),
-      { text: 'Cancel', style: 'cancel' },
-    ]);
+    popup.menu({
+      title: 'Profile photo',
+      actions: [
+        { label: 'Take photo', icon: 'camera-outline', onPress: () => void upload('camera') },
+        { label: 'Choose from library', icon: 'image-outline', onPress: () => void upload('library') },
+        ...(user.avatarUrl ? [{ label: 'Remove photo', icon: 'trash-can-outline', role: 'destructive' as const, onPress: () => void save('') }] : []),
+      ],
+    });
 
   const badge = Math.max(22, Math.round(size * 0.32));
 

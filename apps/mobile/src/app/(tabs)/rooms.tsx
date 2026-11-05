@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, BackHandler, RefreshControl, View } from 'react-native';
+import { BackHandler, RefreshControl, View } from 'react-native';
+import { popup } from '@/components/popup';
 import { qk } from '@expense/api-client';
 import { formatMoney } from '@expense/shared';
 import { TabHeader } from '@/components/TabHeader';
@@ -105,20 +106,20 @@ export default function Rooms() {
     onSuccess: (failed) => {
       setSelected(new Set(failed.map((f) => f.id)));
       void queryClient.invalidateQueries({ queryKey: qk.rooms });
-      if (failed.length) Alert.alert('Some rooms weren’t deleted', errorMessage(failed[0]!.reason));
+      if (failed.length) popup.error('Some rooms weren’t deleted', errorMessage(failed[0]!.reason));
     },
   });
 
   const confirmDelete = () => {
     const count = selected.size;
-    Alert.alert(
-      `Delete ${count} room${count > 1 ? 's' : ''}?`,
-      'All expenses, payments and members will be removed for everyone. Split rooms must be fully settled. This can’t be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: () => removeSelected.mutate([...selected]) },
-      ],
-    );
+    popup.confirm({
+      title: `Delete ${count} room${count > 1 ? 's' : ''}?`,
+      message: 'All expenses, payments and members will be removed for everyone. Split rooms must be fully settled. This can’t be undone.',
+      icon: 'trash-can-outline',
+      confirmLabel: 'Delete',
+      destructive: true,
+      onConfirm: () => removeSelected.mutate([...selected]),
+    });
   };
 
   return (
@@ -252,7 +253,7 @@ function JoinSheet({ onClose }: { onClose: () => void }) {
   const submit = () => {
     const clean = code.trim().toUpperCase().replace(/.*\/JOIN\//, '');
     if (!/^[A-Z0-9]{6,12}$/.test(clean)) {
-      Alert.alert('Invalid code', 'Paste the invite link or enter the code you were sent.');
+      popup.alert('Invalid code', 'Paste the invite link or enter the code you were sent.', 'warning');
       return;
     }
     onClose();

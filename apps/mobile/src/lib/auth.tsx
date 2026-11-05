@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Alert } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
+import { popup } from '@/components/popup';
 import { qk } from '@expense/api-client';
 import type { AuthResult, CategoryDTO, UserDTO } from '@expense/shared';
 import { api, isOffline, setAuthFailureHandler } from './api';
@@ -112,7 +112,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     setAuthFailureHandler((reason) => {
-      void signOut({ remote: false }).then(() => Alert.alert('Signed out', reason));
+      void signOut({ remote: false }).then(() => popup.alert('Signed out', reason, 'warning'));
     });
   }, [signOut]);
 

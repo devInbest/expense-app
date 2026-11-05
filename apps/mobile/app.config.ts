@@ -62,6 +62,7 @@ const config: ExpoConfig = {
   },
   plugins: [
     'expo-router',
+    './plugins/with-windows-cmake-version',
     [
       'expo-splash-screen',
       {

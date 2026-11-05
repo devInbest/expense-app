@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Fragment } from 'react';
-import { Alert } from 'react-native';
 import { qk } from '@expense/api-client';
+import { popup } from '@/components/popup';
 import { AppText, Button, Card, Divider, ErrorState, ListItem, Loading, Screen } from '@/components/ui';
 import { api, errorMessage, showError } from '@/lib/api';
 import { timeAgo } from '@/lib/dates';
@@ -38,10 +38,13 @@ export default function Sessions() {
                     compact
                     variant="ghost"
                     onPress={() =>
-                      Alert.alert('Sign out this device?', undefined, [
-                        { text: 'Cancel', style: 'cancel' },
-                        { text: 'Sign out', style: 'destructive', onPress: () => revoke.mutate(s._id) },
-                      ])
+                      popup.confirm({
+                        title: 'Sign out this device?',
+                        icon: 'logout',
+                        confirmLabel: 'Sign out',
+                        destructive: true,
+                        onConfirm: () => revoke.mutate(s._id),
+                      })
                     }
                   />
                 )

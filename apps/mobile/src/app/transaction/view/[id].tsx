@@ -1,6 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Alert, View } from 'react-native';
+import { View } from 'react-native';
+import { popup } from '@/components/popup';
 import { formatMoney, type PaymentMethod } from '@expense/shared';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppText, Appear, BackdropSlice, Banner, Button, Card, Divider, Glass, Icon, Loading, Row, Screen, TAB_BAR_FADE } from '@/components/ui';
@@ -55,24 +56,24 @@ export default function TransactionView() {
     try {
       await shareReceipt(tx, cat.name, method);
     } catch (err) {
-      Alert.alert('Couldn’t download receipt', errorMessage(err));
+      popup.error('Couldn’t download receipt', errorMessage(err));
     } finally {
       setSharing(false);
     }
   };
 
   const moveToBin = () =>
-    Alert.alert('Move to bin?', 'It won’t count in your totals. You can restore it from the bin anytime.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Move to bin',
-        style: 'destructive',
-        onPress: async () => {
-          await setTransactionBinned(id, true);
-          router.back();
-        },
+    popup.confirm({
+      title: 'Move to bin?',
+      message: 'It won’t count in your totals. You can restore it from the bin anytime.',
+      icon: 'trash-can-outline',
+      confirmLabel: 'Move to bin',
+      destructive: true,
+      onConfirm: async () => {
+        await setTransactionBinned(id, true);
+        router.back();
       },
-    ]);
+    });
 
   const restore = async () => {
     await setTransactionBinned(id, false);

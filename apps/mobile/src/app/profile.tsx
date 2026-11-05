@@ -1,6 +1,7 @@
 import { useMutation } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { Alert, Platform, Pressable, View } from 'react-native';
+import { Platform, Pressable, View } from 'react-native';
+import { popup } from '@/components/popup';
 import { isUpiNumber, type NotificationPrefs } from '@expense/shared';
 import { ProfilePhoto } from '@/components/ProfilePhoto';
 import { AppText, Appear, Button, Card, Divider, Glass, Icon, ListItem, Screen, Section, Segmented, ToggleRow } from '@/components/ui';
@@ -34,52 +35,48 @@ export default function Profile() {
 
   const confirmSignOut = () => {
     const warn = sync.pending + sync.failed > 0;
-    Alert.alert(
-      'Sign out?',
-      warn ? `${sync.pending + sync.failed} change(s) haven't synced yet and will be lost.` : undefined,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Sign out', style: 'destructive', onPress: () => void signOut() },
-      ],
-    );
+    popup.confirm({
+      title: 'Sign out?',
+      message: warn ? `${sync.pending + sync.failed} change(s) haven't synced yet and will be lost.` : undefined,
+      icon: 'logout',
+      confirmLabel: 'Sign out',
+      destructive: true,
+      onConfirm: () => void signOut(),
+    });
   };
 
   const signOutEverywhere = () =>
-    Alert.alert('Sign out of all devices?', 'You will need to sign in again everywhere, including this phone.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Sign out all',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await api.auth.logoutAll();
-          } finally {
-            await signOut({ remote: false });
-          }
-        },
+    popup.confirm({
+      title: 'Sign out of all devices?',
+      message: 'You will need to sign in again everywhere, including this phone.',
+      icon: 'logout-variant',
+      confirmLabel: 'Sign Out All',
+      destructive: true,
+      onConfirm: async () => {
+        try {
+          await api.auth.logoutAll();
+        } finally {
+          await signOut({ remote: false });
+        }
       },
-    ]);
+    });
 
   const deleteAccount = () =>
-    Alert.alert(
-      'Delete your account?',
-      'Your personal expenses, budgets and profile are permanently deleted. Shared room history stays with other members as "Former member". This cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete forever',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await api.me.deleteAccount();
-              await signOut({ remote: false });
-            } catch (err) {
-              showError(err, "Couldn't delete account");
-            }
-          },
-        },
-      ],
-    );
+    popup.confirm({
+      title: 'Delete your account?',
+      message: 'Your expenses, budgets, and profile will be permanently deleted.',
+      icon: 'account-remove-outline',
+      confirmLabel: 'Delete',
+      destructive: true,
+      onConfirm: async () => {
+        try {
+          await api.me.deleteAccount();
+          await signOut({ remote: false });
+        } catch (err) {
+          showError(err, "Couldn't delete account");
+        }
+      },
+    });
 
   return (
     <Screen edges={['bottom']} contentStyle={{ paddingBottom: spacing.lg }}>

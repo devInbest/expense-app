@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Alert, Switch, View } from 'react-native';
+import { Switch, View } from 'react-native';
+import { popup } from '@/components/popup';
 import { qk } from '@expense/api-client';
 import { RECURRING_FREQUENCY_VALUES, formatMoney, toMinor, type RecurringFrequency, type RecurringRuleDTO } from '@expense/shared';
 import { AmountInput, CategoryGrid, DateField } from '@/components/finance';
@@ -72,10 +73,14 @@ export default function Recurring() {
                     icon="trash-can-outline"
                     label="Delete"
                     onPress={() =>
-                      Alert.alert('Delete recurring rule?', 'Transactions already created are kept.', [
-                        { text: 'Cancel', style: 'cancel' },
-                        { text: 'Delete', style: 'destructive', onPress: () => remove.mutate(r._id) },
-                      ])
+                      popup.confirm({
+                        title: 'Delete recurring rule?',
+                        message: 'Transactions already created are kept.',
+                        icon: 'trash-can-outline',
+                        confirmLabel: 'Delete',
+                        destructive: true,
+                        onConfirm: () => remove.mutate(r._id),
+                      })
                     }
                   />
                 </Row>

@@ -1,7 +1,8 @@
 import { Image } from 'expo-image';
 import { Redirect, router, Stack, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { ActionSheetIOS, Alert, Platform, View } from 'react-native';
+import { View } from 'react-native';
+import { popup } from '@/components/popup';
 import { fromMinor, PAYMENT_METHOD_VALUES, toMinor, type PaymentMethod, type TransactionType, LIMITS } from '@expense/shared';
 import { AmountInput, CategoryGrid, DateField } from '@/components/finance';
 import { Appear, Button, Chip, ErrorText, Field, Glass, Loading, Row, Screen, Section, Segmented } from '@/components/ui';
@@ -91,29 +92,20 @@ function TransactionFormBody({ existing }: { existing?: LocalTransaction }) {
         trackFeature('receipt_upload');
       }
     } catch (err) {
-      Alert.alert('Upload failed', isOffline(err) ? 'Receipts need an internet connection.' : errorMessage(err));
+      popup.error('Upload failed', isOffline(err) ? 'Receipts need an internet connection.' : errorMessage(err));
     } finally {
       setUploading(false);
     }
   };
 
-  const chooseReceiptSource = () => {
-    if (Platform.OS === 'ios') {
-      ActionSheetIOS.showActionSheetWithOptions(
-        { options: ['Take photo', 'Choose from library', 'Cancel'], cancelButtonIndex: 2 },
-        (i) => {
-          if (i === 0) void attach('camera');
-          if (i === 1) void attach('library');
-        },
-      );
-    } else {
-      Alert.alert('Add receipt', undefined, [
-        { text: 'Camera', onPress: () => void attach('camera') },
-        { text: 'Gallery', onPress: () => void attach('library') },
-        { text: 'Cancel', style: 'cancel' },
-      ]);
-    }
-  };
+  const chooseReceiptSource = () =>
+    popup.menu({
+      title: 'Add receipt',
+      actions: [
+        { label: 'Take photo', icon: 'camera-outline', onPress: () => void attach('camera') },
+        { label: 'Choose from library', icon: 'image-outline', onPress: () => void attach('library') },
+      ],
+    });
 
   return (
     <Screen edges={['bottom']} contentStyle={{ paddingBottom: spacing.lg }}>

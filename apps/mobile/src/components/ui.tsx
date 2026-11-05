@@ -1,7 +1,7 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { BlurView } from 'expo-blur';
 import { Image } from 'expo-image';
-import { createContext, useContext, useEffect, useState, type ComponentProps, type ReactElement, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ComponentProps, type ReactElement, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -40,7 +40,7 @@ import Animated, {
   type AnimatedRef,
   type SharedValue,
 } from 'react-native-reanimated';
-import { scheduleOnUI } from 'react-native-worklets';
+import { scheduleOnRN, scheduleOnUI } from 'react-native-worklets';
 import { SafeAreaView, useSafeAreaFrame, useSafeAreaInsets, type Edge } from 'react-native-safe-area-context';
 import { radius, spacing, useTheme } from '@/theme';
 
@@ -761,14 +761,60 @@ export const useFieldBoxStyle = (): ViewStyle => {
 export function Field({
   label,
   error,
+  invalid = false,
   hint,
+  /** Start locked; a pencil on the right unlocks editing. */
+  lockable = false,
+  /** Controlled unlock — only one field should be `true` at a time. */
+  editing,
+  onRequestEdit,
   style,
   onFocus,
   onBlur,
+  editable,
   ...input
-}: TextInputProps & { label?: string; error?: string | null; hint?: string }) {
+}: TextInputProps & {
+  label?: string;
+  error?: string | null;
+  /** Red border only, with no message under the field. */
+  invalid?: boolean;
+  hint?: string;
+  lockable?: boolean;
+  editing?: boolean;
+  onRequestEdit?: () => void;
+}) {
   const { colors } = useTheme();
+  const inputRef = useRef<TextInput>(null);
   const [focused, setFocused] = useState(false);
+  const [unlockedLocal, setUnlockedLocal] = useState(!lockable);
+  const controlled = lockable && editing !== undefined;
+  const unlocked = lockable ? (controlled ? editing : unlockedLocal) : true;
+  const canEdit = lockable ? unlocked : editable !== false;
+  const invalidField = Boolean(error) || invalid;
+  const active = focused && unlocked;
+
+  useEffect(() => {
+    if (!controlled) return;
+    if (editing) {
+      setFocused(true);
+      // Wait until `editable` flips before focusing — Android ignores focus on a locked input.
+      const t = setTimeout(() => inputRef.current?.focus(), 0);
+      return () => clearTimeout(t);
+    }
+    setFocused(false);
+    inputRef.current?.blur();
+  }, [controlled, editing]);
+
+  const unlock = () => {
+    if (controlled) {
+      onRequestEdit?.();
+      return;
+    }
+    setUnlockedLocal(true);
+    setFocused(true);
+    setTimeout(() => inputRef.current?.focus(), 0);
+  };
+
   return (
     <View style={{ gap: spacing.xs }}>
       {label ? (
@@ -779,14 +825,18 @@ export function Field({
       {/* Padding lives on the wrapper: Android TextInput drops its own horizontal padding on re-render. */}
       <View
         style={{
-          backgroundColor: focused ? colors.glassStrong : colors.glass,
-          borderColor: error ? colors.danger : focused ? colors.primary : colors.glassBorder,
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: active ? colors.glassStrong : colors.glass,
+          borderColor: invalidField ? colors.danger : active ? colors.primary : colors.glassBorder,
           borderWidth: 1.5,
           borderRadius: radius.md,
           paddingHorizontal: spacing.lg,
-          boxShadow: focused ? `0 0 0 4px ${colors.primaryMuted}` : `0 4px 14px ${colors.shadow}`,
+          boxShadow: invalidField ? `0 0 0 4px ${colors.danger}26` : active ? `0 0 0 4px ${colors.primaryMuted}` : `0 4px 14px ${colors.shadow}`,
         }}>
         <TextInput
+          ref={inputRef}
+          editable={canEdit}
           placeholderTextColor={colors.textSubtle}
           selectionColor={colors.primary}
           cursorColor={colors.primary}
@@ -798,9 +848,19 @@ export function Field({
             setFocused(false);
             onBlur?.(e);
           }}
-          style={[{ paddingHorizontal: 0, paddingVertical: 14, fontSize: 16, color: colors.text }, style]}
+          style={[{ flex: 1, paddingHorizontal: 0, paddingVertical: 14, fontSize: 16, color: colors.text }, style]}
           {...input}
         />
+        {lockable && !unlocked ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={label ? `Edit ${label}` : 'Edit'}
+            hitSlop={8}
+            onPress={unlock}
+            style={({ pressed }) => ({ paddingLeft: spacing.sm, opacity: pressed ? 0.6 : 1 })}>
+            <Icon name="pencil-outline" size={18} color={colors.textMuted} />
+          </Pressable>
+        ) : null}
       </View>
       {error ? (
         <AppText variant="caption" color={colors.danger} style={{ paddingHorizontal: spacing.xs }}>
@@ -1165,7 +1225,155 @@ export function ProgressBar({ percent, color, height = 8 }: { percent: number; c
   );
 }
 
-/** Page-sheet modal with a title bar; content scrolls. */
+const OVERLAY_ENTER = { duration: 320, easing: Easing.out(Easing.cubic) };
+const OVERLAY_EXIT = { duration: 200, easing: Easing.in(Easing.cubic) };
+
+/** Drives a modal overlay in and out. `onHidden` runs after the close animation. */
+export function useOverlayMotion(visible: boolean, onHidden?: () => void) {
+  const progress = useSharedValue(0);
+  const [present, setPresent] = useState(visible);
+  const onHiddenRef = useRef(onHidden);
+
+  const hide = useCallback(() => {
+    setPresent(false);
+    onHiddenRef.current?.();
+  }, []);
+
+  useEffect(() => {
+    onHiddenRef.current = onHidden;
+  }, [onHidden]);
+
+  if (visible && !present) setPresent(true);
+
+  useEffect(() => {
+    if (!present) return;
+    if (visible) {
+      progress.set(0);
+      progress.set(withTiming(1, OVERLAY_ENTER));
+      return;
+    }
+    progress.set(
+      withTiming(0, OVERLAY_EXIT, (finished) => {
+        if (finished) scheduleOnRN(hide);
+      }),
+    );
+  }, [visible, present, hide, progress]);
+
+  const scrimStyle = useAnimatedStyle(() => ({ opacity: progress.get() }));
+  const cardStyle = useAnimatedStyle(() => ({
+    opacity: progress.get(),
+    transform: [{ scale: 0.94 + progress.get() * 0.06 }],
+  }));
+  const sheetStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: (1 - progress.get()) * 800 }],
+  }));
+  const toastStyle = useAnimatedStyle(() => ({
+    opacity: progress.get(),
+    transform: [{ translateY: (1 - progress.get()) * -18 }],
+  }));
+
+  return { mounted: present, scrimStyle, cardStyle, sheetStyle, toastStyle };
+}
+
+/** Frosted panel used by dialogs and sheets. iOS blurs; Android uses a solid surface. */
+export function FrostedSurface({
+  children,
+  style,
+  rounded = radius.xl,
+  edge = 'all',
+}: {
+  children?: ReactNode;
+  style?: StyleProp<ViewStyle>;
+  rounded?: number;
+  edge?: 'all' | 'top';
+}) {
+  const { colors, dark } = useTheme();
+  const blur = Platform.OS === 'ios';
+  const corners =
+    edge === 'top'
+      ? { borderTopLeftRadius: rounded, borderTopRightRadius: rounded }
+      : { borderRadius: rounded };
+  return (
+    <View
+      style={[
+        {
+          overflow: 'hidden',
+          backgroundColor: blur ? colors.glassStrong : colors.surface,
+          borderWidth: 1,
+          borderColor: colors.glassBorder,
+          boxShadow: `0 24px 60px ${colors.shadow}`,
+          ...corners,
+        },
+        style,
+      ]}>
+      {blur ? (
+        <BlurView
+          pointerEvents="none"
+          intensity={dark ? 55 : 80}
+          tint={dark ? 'systemChromeMaterialDark' : 'systemChromeMaterialLight'}
+          style={StyleSheet.absoluteFill}
+        />
+      ) : null}
+      <View
+        pointerEvents="none"
+        style={[
+          StyleSheet.absoluteFill,
+          { experimental_backgroundImage: `linear-gradient(180deg, ${colors.glassHighlight} 0%, rgba(255,255,255,0) 46%)` },
+        ]}
+      />
+      <View style={{ zIndex: 1 }}>{children}</View>
+    </View>
+  );
+}
+
+export function OverlayScrim({ style, onPress }: { style?: object; onPress?: () => void }) {
+  const { colors, dark } = useTheme();
+  const wash = Platform.OS === 'ios' ? (dark ? 'rgba(0,0,0,0.45)' : 'rgba(0,0,0,0.22)') : colors.scrim;
+  return (
+    <Animated.View style={[StyleSheet.absoluteFill, style]}>
+      <Pressable accessibilityLabel="Dismiss" style={StyleSheet.absoluteFill} onPress={onPress}>
+        {Platform.OS === 'ios' ? (
+          <BlurView pointerEvents="none" intensity={28} tint={dark ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />
+        ) : null}
+        <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: wash }]} />
+      </Pressable>
+    </Animated.View>
+  );
+}
+
+/** Animated bottom sheet shell. Content hugs its height up to most of the screen. */
+export function SheetFrame({
+  visible,
+  onClose,
+  onHidden,
+  dismissOnScrim = false,
+  children,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onHidden?: () => void;
+  dismissOnScrim?: boolean;
+  children: ReactNode;
+}) {
+  const insets = useSafeAreaInsets();
+  const { mounted, scrimStyle, sheetStyle } = useOverlayMotion(visible, onHidden);
+  return (
+    <Modal visible={mounted} transparent statusBarTranslucent animationType="none" onRequestClose={onClose}>
+      <View style={{ flex: 1 }}>
+        <OverlayScrim style={scrimStyle} onPress={dismissOnScrim ? onClose : undefined} />
+        <KeyboardAvoidingView behavior="padding" pointerEvents="box-none" style={{ flex: 1, justifyContent: 'flex-end' }}>
+          <Animated.View style={[{ width: '100%', maxHeight: '94%' }, sheetStyle]}>
+            <FrostedSurface edge="top" style={{ paddingBottom: Math.max(insets.bottom, spacing.sm) }}>
+              {children}
+            </FrostedSurface>
+          </Animated.View>
+        </KeyboardAvoidingView>
+      </View>
+    </Modal>
+  );
+}
+
+/** Bottom sheet with a title bar; content scrolls. */
 export function Sheet({
   visible,
   title,
@@ -1179,34 +1387,31 @@ export function Sheet({
   onClose: () => void;
   children: ReactNode;
 }) {
+  const { height } = useSafeAreaFrame();
   const { scrollY, onScroll } = useRevealScroll();
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <View style={{ flex: 1 }}>
-        <Backdrop />
-        <SafeAreaView style={{ flex: 1 }}>
-          <SheetHeader title={title} icon={icon} onClose={onClose} />
-          <RevealScope scrollY={scrollY}>
-            <KeyboardAwareScrollView
-              bottomOffset={spacing.xl}
-              contentContainerStyle={{ flexGrow: 1, padding: spacing.lg, paddingTop: 0, gap: spacing.lg }}
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={false}
-              onScroll={onScroll}>
-              {children}
-            </KeyboardAwareScrollView>
-          </RevealScope>
-        </SafeAreaView>
-      </View>
-    </Modal>
+    <SheetFrame visible={visible} onClose={onClose} dismissOnScrim>
+      <SheetHeader title={title} icon={icon} onClose={onClose} />
+      <RevealScope scrollY={scrollY}>
+        <KeyboardAwareScrollView
+          style={{ maxHeight: Math.max(240, height * 0.78) }}
+          bottomOffset={spacing.md}
+          contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.lg, gap: spacing.lg }}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          onScroll={onScroll}>
+          {children}
+        </KeyboardAwareScrollView>
+      </RevealScope>
+    </SheetFrame>
   );
 }
 
 export function SheetHeader({ title, icon, onClose }: { title: string; icon?: string; onClose: () => void }) {
   const { colors } = useTheme();
   return (
-    <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.lg, gap: spacing.md }}>
-      <View style={{ alignSelf: 'center', width: 40, height: 5, borderRadius: 3, backgroundColor: colors.textSubtle, opacity: 0.5 }} />
+    <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.md, gap: spacing.md }}>
+      <View style={{ alignSelf: 'center', width: 44, height: 5, borderRadius: 3, backgroundColor: colors.textSubtle, opacity: 0.45 }} />
       <Row style={{ gap: spacing.sm }}>
         {icon ? <Icon name={icon} size={22} color={colors.primary} /> : null}
         <AppText variant="heading" style={{ flex: 1 }}>

@@ -1,5 +1,5 @@
-import { Alert } from 'react-native';
 import { ApiClientError, createCustomerApi, createHttp } from '@expense/api-client';
+import { popup } from '@/components/popup';
 import { config } from './config';
 import { tokenStorage } from './secure';
 
@@ -31,4 +31,4 @@ export const errorMessage = (err: unknown): string => {
 
 export const isOffline = (err: unknown) => err instanceof ApiClientError && err.isNetworkError;
 
-export const showError = (err: unknown, title = 'Something went wrong') => Alert.alert(title, errorMessage(err));
+export const showError = (err: unknown, title = 'Something went wrong') => popup.error(title, errorMessage(err));

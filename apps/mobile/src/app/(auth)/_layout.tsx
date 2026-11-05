@@ -16,8 +16,10 @@ export default function AuthLayout() {
         contentStyle: { backgroundColor: colors.background },
       }}>
       <Stack.Screen name="welcome" options={{ headerShown: false }} />
+      {/* Phone login temporarily disabled — Google only for now.
       <Stack.Screen name="phone" />
       <Stack.Screen name="verify" />
+      */}
     </Stack>
   );
 }

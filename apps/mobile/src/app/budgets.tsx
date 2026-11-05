@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
-import { Alert, RefreshControl, Switch, View } from 'react-native';
+import { RefreshControl, Switch, View } from 'react-native';
+import { popup } from '@/components/popup';
 import { qk } from '@expense/api-client';
 import { formatMoney, fromMinor, toMinor, type BudgetPeriod, type BudgetProgressDTO, type CategoryDTO } from '@expense/shared';
 import { AmountInput, CategoryGrid } from '@/components/finance';
@@ -117,14 +118,13 @@ export default function Budgets() {
         categoryById={byId}
         onClose={() => setSelected(null)}
         onDelete={(id) =>
-          Alert.alert('Delete budget?', undefined, [
-            { text: 'Cancel', style: 'cancel' },
-            {
-              text: 'Delete',
-              style: 'destructive',
-              onPress: () => remove.mutate(id, { onSuccess: () => setSelected(null) }),
-            },
-          ])
+          popup.confirm({
+            title: 'Delete budget?',
+            icon: 'trash-can-outline',
+            confirmLabel: 'Delete',
+            destructive: true,
+            onConfirm: () => remove.mutate(id, { onSuccess: () => setSelected(null) }),
+          })
         }
       />
     </View>
