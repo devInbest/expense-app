@@ -165,9 +165,18 @@ export const linkBankTransaction = async (user: UserDoc, id: string, input: Link
   }
 };
 
+/** Permanently hide an ignored transaction. The fingerprint stays so a later SMS scan cannot bring it back. */
+export const deleteBankTransaction = async (userId: unknown, id: string) => {
+  const doc = await findOwn(userId, id);
+  if (doc.status === 'deleted') return;
+  if (doc.status !== 'ignored') throw ApiError.conflict('Only ignored bank transactions can be deleted');
+  await BankTransaction.updateOne({ _id: doc._id, status: 'ignored' }, { $set: { status: 'deleted' } });
+};
+
 /** Ignore (already added by hand, self-transfer, ...) or bring an ignored one back for review. Idempotent. */
 export const setIgnored = async (userId: unknown, id: string, ignored: boolean) => {
   const doc = await findOwn(userId, id);
+  if (doc.status === 'deleted') throw ApiError.notFound('Bank transaction not found');
   if (doc.status === 'linked') throw ApiError.conflict('This bank transaction has already been saved');
   const next = ignored ? 'ignored' : 'pending';
   if (doc.status === next) return toBankTransactionDTO(doc);

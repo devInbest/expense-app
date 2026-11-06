@@ -1,21 +1,22 @@
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { AppState, FlatList, Linking, Platform, RefreshControl, View } from 'react-native';
+import { AppState, Linking, Platform, View } from 'react-native';
+import { FlatList, RefreshControl } from 'react-native-gesture-handler';
 import { popup } from '@/components/popup';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { qk } from '@expense/api-client';
 import type { BankTxnStatus } from '@expense/shared';
-import { BankTxnRow, SwipeableBankTxnRow, SwipeableRestoreBankTxnRow } from '@/components/BankTxnRow';
+import { BankTxnRow, SwipeableBankTxnRow, SwipeableIgnoredBankTxnRow } from '@/components/BankTxnRow';
 import { TabHeader } from '@/components/TabHeader';
-import { AppText, Appear, Backdrop, Banner, Button, Card, CategoryIcon, EmptyState, ErrorState, Loading, RevealScope, Row, Segmented, useRevealList, useTabBarInset } from '@/components/ui';
+import { AppText, Backdrop, Banner, Button, Card, CategoryIcon, EmptyState, ErrorState, Loading, Row, Segmented, useTabBarInset } from '@/components/ui';
 import { trackFeature } from '@/lib/analytics';
 import { api, errorMessage, showError } from '@/lib/api';
 import { isSmsImportEnabled, requestSmsPermission, scanBankSms, SMS_ACCESS_KEY, smsImportSupported } from '@/lib/bankSms';
 import { radius, spacing, useTheme } from '@/theme';
 
 const TABS: { value: BankTxnStatus; label: string }[] = [
-  { value: 'pending', label: 'Transactions' },
+  { value: 'pending', label: 'Unreviewed' },
   { value: 'linked', label: 'Marked' },
   { value: 'ignored', label: 'Ignored' },
 ];
@@ -38,7 +39,6 @@ export default function BankInbox() {
   const { colors } = useTheme();
   const tabInset = useTabBarInset();
   const queryClient = useQueryClient();
-  const reveal = useRevealList();
   const [status, setStatus] = useState<BankTxnStatus>('pending');
   const [refreshing, setRefreshing] = useState(false);
 
@@ -98,7 +98,7 @@ export default function BankInbox() {
 
   const header = (
     <View style={{ gap: spacing.md, marginBottom: spacing.md }}>
-      <TabHeader title="Bank" />
+      <TabHeader title="Bank Transaction" />
       {pending && status === 'pending' ? <Banner icon="bank-transfer" text={`${pending} bank transaction${pending > 1 ? 's' : ''} to review`} /> : null}
       {setup === 'unsupported' && Platform.OS !== 'android' ? (
         <Banner icon="information-outline" text="Bank SMS can only be read on Android. Transactions imported on your Android phone show up here too." />
@@ -116,7 +116,7 @@ export default function BankInbox() {
       <View style={{ flex: 1 }}>
         <Backdrop />
         <SafeAreaView edges={['top']} style={{ flex: 1, padding: spacing.lg, paddingBottom: tabInset + spacing.lg }}>
-          <TabHeader title="Bank" />
+          <TabHeader title="Bank Transaction" />
           <View style={{ flex: 1, justifyContent: 'center' }}>
             <EnableCard onEnable={enable} />
           </View>
@@ -129,14 +129,15 @@ export default function BankInbox() {
     <View style={{ flex: 1 }}>
       <Backdrop />
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
-        <RevealScope scrollY={reveal.scrollY}>
           <FlatList
             data={items}
             keyExtractor={(t) => t._id}
             contentContainerStyle={{ flexGrow: 1, padding: spacing.lg, paddingBottom: tabInset + spacing.lg }}
             showsVerticalScrollIndicator={false}
-            onScroll={reveal.onScroll}
-            scrollEventThrottle={reveal.scrollEventThrottle}
+            directionalLockEnabled
+            windowSize={7}
+            initialNumToRender={8}
+            maxToRenderPerBatch={8}
             ListHeaderComponent={header}
             refreshControl={
               <RefreshControl
@@ -221,22 +222,28 @@ export default function BankInbox() {
                 }
               };
 
-              return (
-                <Appear index={index}>
-                  {status === 'pending' ? (
-                    <SwipeableBankTxnRow item={item} onPress={open} onIgnore={ignore} shellStyle={shell} corners={corners} />
-                  ) : status === 'ignored' ? (
-                    <SwipeableRestoreBankTxnRow item={item} onPress={open} onRestore={restore} shellStyle={shell} corners={corners} />
-                  ) : (
-                    <View style={[shell, corners, { overflow: 'hidden' }]}>
-                      <BankTxnRow item={item} onPress={open} />
-                    </View>
-                  )}
-                </Appear>
+              const remove = async () => {
+                dropFrom(qk.bankTransactions('ignored'));
+                try {
+                  await api.bank.remove(item._id);
+                  await queryClient.invalidateQueries({ queryKey: qk.bankAll });
+                } catch (err) {
+                  await queryClient.invalidateQueries({ queryKey: qk.bankAll });
+                  popup.error("Couldn't delete", errorMessage(err));
+                }
+              };
+
+              return status === 'pending' ? (
+                <SwipeableBankTxnRow item={item} onPress={open} onIgnore={ignore} onMark={open} shellStyle={shell} corners={corners} />
+              ) : status === 'ignored' ? (
+                <SwipeableIgnoredBankTxnRow item={item} onPress={open} onRestore={restore} onDelete={remove} shellStyle={shell} corners={corners} />
+              ) : (
+                <View style={[shell, corners, { overflow: 'hidden' }]}>
+                  <BankTxnRow item={item} onPress={open} />
+                </View>
               );
             }}
           />
-        </RevealScope>
       </SafeAreaView>
     </View>
   );

@@ -22,7 +22,7 @@ const bankTransactionSchema = new mongoose.Schema(
     accountMask: { type: String, default: '' },
     reference: { type: String, default: '' },
     paymentMethod: { type: String, enum: PAYMENT_METHOD_VALUES, default: 'bank' },
-    status: { type: String, enum: BANK_TXN_STATUS_VALUES, default: 'pending' },
+    status: { type: String, enum: [...BANK_TXN_STATUS_VALUES, 'deleted'], default: 'pending' },
     link: {
       type: new mongoose.Schema(
         {

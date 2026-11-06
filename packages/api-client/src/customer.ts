@@ -131,6 +131,7 @@ export const createCustomerApi = (http: AxiosInstance) => {
       link: (id: string, body: LinkBankTransactionInput) => post<LinkBankTransactionResult>(`/bank-transactions/${id}/link`, body),
       ignore: (id: string) => post<BankTransactionDTO>(`/bank-transactions/${id}/ignore`),
       restore: (id: string) => post<BankTransactionDTO>(`/bank-transactions/${id}/restore`),
+      remove: (id: string) => del<null>(`/bank-transactions/${id}`),
     },
 
     budgets: {

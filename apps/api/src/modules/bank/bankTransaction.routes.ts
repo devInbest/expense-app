@@ -29,5 +29,6 @@ router.post(
 
 router.post('/:id/ignore', asyncHandler(async (req, res) => ok(res, await service.setIgnored(req.user!._id, String(req.params.id), true), 'Ignored')));
 router.post('/:id/restore', asyncHandler(async (req, res) => ok(res, await service.setIgnored(req.user!._id, String(req.params.id), false), 'Moved back to review')));
+router.delete('/:id', asyncHandler(async (req, res) => ok(res, await service.deleteBankTransaction(req.user!._id, String(req.params.id)), 'Deleted')));
 
 export default router;
