@@ -1,7 +1,7 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { BlurView } from 'expo-blur';
 import { Image } from 'expo-image';
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ComponentProps, type ReactElement, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentProps, type ReactElement, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -22,6 +22,7 @@ import {
   type TextStyle,
   type ViewStyle,
 } from 'react-native';
+import { GestureDetector, GestureHandlerRootView, useNativeGesture, usePanGesture, type PanGestureActiveEvent } from 'react-native-gesture-handler';
 import { KeyboardAvoidingView, KeyboardAwareScrollView, KeyboardStickyView } from 'react-native-keyboard-controller';
 import Animated, {
   Easing,
@@ -967,7 +968,19 @@ export function Segmented<T extends string>({
   );
 }
 
-export function Chip({ label, selected, onPress, icon }: { label: string; selected?: boolean; onPress?: () => void; icon?: string }) {
+export function Chip({
+  label,
+  selected,
+  onPress,
+  icon,
+  style,
+}: {
+  label: string;
+  selected?: boolean;
+  onPress?: () => void;
+  icon?: string;
+  style?: StyleProp<ViewStyle>;
+}) {
   const { colors } = useTheme();
   const press = usePressScale(0.94);
   return (
@@ -993,6 +1006,7 @@ export function Chip({ label, selected, onPress, icon }: { label: string; select
           experimental_backgroundImage: linearGradient('#FF6A2E', colors.primaryDeep),
           boxShadow: `0 6px 16px ${colors.primaryGlow}`,
         },
+        style,
         press.style,
       ]}>
       {icon ? <Icon name={icon} size={14} color={selected ? colors.onPrimary : colors.textMuted} /> : null}
@@ -1229,7 +1243,7 @@ const OVERLAY_ENTER = { duration: 320, easing: Easing.out(Easing.cubic) };
 const OVERLAY_EXIT = { duration: 200, easing: Easing.in(Easing.cubic) };
 
 /** Drives a modal overlay in and out. `onHidden` runs after the close animation. */
-export function useOverlayMotion(visible: boolean, onHidden?: () => void) {
+export function useOverlayMotion(visible: boolean, onHidden?: () => void, dragY?: SharedValue<number>) {
   const progress = useSharedValue(0);
   const [present, setPresent] = useState(visible);
   const onHiddenRef = useRef(onHidden);
@@ -1265,7 +1279,7 @@ export function useOverlayMotion(visible: boolean, onHidden?: () => void) {
     transform: [{ scale: 0.94 + progress.get() * 0.06 }],
   }));
   const sheetStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: (1 - progress.get()) * 800 }],
+    transform: [{ translateY: (1 - progress.get()) * 800 + (dragY ? dragY.get() : 0) }],
   }));
   const toastStyle = useAnimatedStyle(() => ({
     opacity: progress.get(),
@@ -1341,34 +1355,133 @@ export function OverlayScrim({ style, onPress }: { style?: object; onPress?: () 
   );
 }
 
+type SheetDragControls = { dragY: SharedValue<number>; atTop: SharedValue<boolean>; onClose: () => void };
+
+const SheetDragContext = createContext<SheetDragControls | null>(null);
+
+/** Pull the sheet down to close. Upward movement stays with the list. */
+function DismissibleSheet({ header, children }: { header: ReactNode; children: ReactNode }) {
+  const drag = useContext(SheetDragContext);
+  const dragY = drag?.dragY;
+  const atTop = drag?.atTop;
+  const closeSheet = drag?.onClose;
+  const native = useNativeGesture();
+  const pan = usePanGesture(
+    useMemo(
+      () => ({
+        enabled: atTop,
+        simultaneousWith: native,
+        activeOffsetY: [-10000, 12] as [number, number],
+        failOffsetY: [-16, 10000] as [number, number],
+        failOffsetX: [-28, 28] as [number, number],
+        cancelsTouchesInView: true,
+        onUpdate: (event: PanGestureActiveEvent) => {
+          'worklet';
+          if (!dragY || !atTop?.get()) return;
+          dragY.set(Math.max(0, event.translationY));
+        },
+        onDeactivate: (event: PanGestureActiveEvent) => {
+          'worklet';
+          if (!dragY || !closeSheet) return;
+          const y = atTop?.get() ? Math.max(0, event.translationY) : 0;
+          if (y > 90 || (atTop?.get() && event.velocityY > 800)) {
+            scheduleOnRN(closeSheet);
+            return;
+          }
+          dragY.set(withTiming(0, { duration: 180 }));
+        },
+      }),
+      [atTop, closeSheet, dragY, native],
+    ),
+  );
+  const { height } = useSafeAreaFrame();
+  const scrollY = useSharedValue(0);
+  const onScroll = useAnimatedScrollHandler((event) => {
+    scrollY.set(event.contentOffset.y);
+    if (atTop) atTop.set(event.contentOffset.y <= 1);
+  });
+  const scroller = (
+    <KeyboardAwareScrollView
+      style={{ maxHeight: Math.max(240, height * 0.78) }}
+      bottomOffset={spacing.md}
+      contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.xl, gap: spacing.lg }}
+      keyboardShouldPersistTaps="handled"
+      nestedScrollEnabled
+      showsVerticalScrollIndicator={false}
+      onScroll={onScroll}>
+      {children}
+    </KeyboardAwareScrollView>
+  );
+  if (!drag) {
+    return (
+      <>
+        {header}
+        <RevealScope scrollY={scrollY}>{scroller}</RevealScope>
+      </>
+    );
+  }
+  return (
+    <GestureDetector gesture={pan}>
+      <View>
+        {header}
+        <RevealScope scrollY={scrollY}>
+          <GestureDetector gesture={native}>{scroller}</GestureDetector>
+        </RevealScope>
+      </View>
+    </GestureDetector>
+  );
+}
+
 /** Animated bottom sheet shell. Content hugs its height up to most of the screen. */
 export function SheetFrame({
   visible,
   onClose,
   onHidden,
   dismissOnScrim = false,
+  dragToDismiss = false,
   children,
 }: {
   visible: boolean;
   onClose: () => void;
   onHidden?: () => void;
   dismissOnScrim?: boolean;
+  /** Header can be pulled down to close. */
+  dragToDismiss?: boolean;
   children: ReactNode;
 }) {
   const insets = useSafeAreaInsets();
-  const { mounted, scrimStyle, sheetStyle } = useOverlayMotion(visible, onHidden);
+  const dragY = useSharedValue(0);
+  const atTop = useSharedValue(true);
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+  const close = useCallback(() => onCloseRef.current(), []);
+  const dragControls = useMemo(() => ({ dragY, atTop, onClose: close }), [dragY, atTop, close]);
+  const { mounted, scrimStyle, sheetStyle } = useOverlayMotion(visible, onHidden, dragY);
+
+  useLayoutEffect(() => {
+    if (visible) {
+      dragY.set(0);
+      atTop.set(true);
+    }
+  }, [visible, dragY, atTop]);
+
+  const frame = (
+    <View style={{ flex: 1 }}>
+      <OverlayScrim style={scrimStyle} onPress={dismissOnScrim ? onClose : undefined} />
+      <KeyboardAvoidingView behavior="padding" pointerEvents="box-none" style={{ flex: 1, justifyContent: 'flex-end' }}>
+        <Animated.View style={[{ width: '100%', maxHeight: '94%' }, sheetStyle]}>
+          <FrostedSurface edge="top" style={{ paddingBottom: Math.max(insets.bottom, spacing.sm) }}>
+            <SheetDragContext.Provider value={dragToDismiss ? dragControls : null}>{children}</SheetDragContext.Provider>
+          </FrostedSurface>
+        </Animated.View>
+      </KeyboardAvoidingView>
+    </View>
+  );
   return (
     <Modal visible={mounted} transparent statusBarTranslucent animationType="none" onRequestClose={onClose}>
-      <View style={{ flex: 1 }}>
-        <OverlayScrim style={scrimStyle} onPress={dismissOnScrim ? onClose : undefined} />
-        <KeyboardAvoidingView behavior="padding" pointerEvents="box-none" style={{ flex: 1, justifyContent: 'flex-end' }}>
-          <Animated.View style={[{ width: '100%', maxHeight: '94%' }, sheetStyle]}>
-            <FrostedSurface edge="top" style={{ paddingBottom: Math.max(insets.bottom, spacing.sm) }}>
-              {children}
-            </FrostedSurface>
-          </Animated.View>
-        </KeyboardAvoidingView>
-      </View>
+      {dragToDismiss ? <GestureHandlerRootView style={{ flex: 1 }}>{frame}</GestureHandlerRootView> : frame}
     </Modal>
   );
 }
@@ -1379,46 +1492,66 @@ export function Sheet({
   title,
   icon,
   onClose,
+  showClose = true,
+  dragToDismiss = false,
   children,
 }: {
   visible: boolean;
-  title: string;
+  title?: string;
   icon?: string;
   onClose: () => void;
+  /** Hide the header close button. The sheet still closes from the scrim or a downward drag. */
+  showClose?: boolean;
+  /** Pull the header down to close. */
+  dragToDismiss?: boolean;
   children: ReactNode;
 }) {
   const { height } = useSafeAreaFrame();
   const { scrollY, onScroll } = useRevealScroll();
+  const header = <SheetHeader title={title} icon={icon} onClose={onClose} showClose={showClose} />;
   return (
-    <SheetFrame visible={visible} onClose={onClose} dismissOnScrim>
-      <SheetHeader title={title} icon={icon} onClose={onClose} />
-      <RevealScope scrollY={scrollY}>
-        <KeyboardAwareScrollView
-          style={{ maxHeight: Math.max(240, height * 0.78) }}
-          bottomOffset={spacing.md}
-          contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.lg, gap: spacing.lg }}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-          onScroll={onScroll}>
-          {children}
-        </KeyboardAwareScrollView>
-      </RevealScope>
+    <SheetFrame visible={visible} onClose={onClose} dismissOnScrim dragToDismiss={dragToDismiss}>
+      {dragToDismiss ? (
+        <DismissibleSheet header={header}>{children}</DismissibleSheet>
+      ) : (
+        <>
+          {header}
+          <RevealScope scrollY={scrollY}>
+            <KeyboardAwareScrollView
+              style={{ maxHeight: Math.max(240, height * 0.78) }}
+              bottomOffset={spacing.md}
+              contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.lg, gap: spacing.lg }}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              onScroll={onScroll}>
+              {children}
+            </KeyboardAwareScrollView>
+          </RevealScope>
+        </>
+      )}
     </SheetFrame>
   );
 }
 
-export function SheetHeader({ title, icon, onClose }: { title: string; icon?: string; onClose: () => void }) {
+export function SheetHeader({ title, icon, onClose, showClose = true }: { title?: string; icon?: string; onClose: () => void; showClose?: boolean }) {
   const { colors } = useTheme();
+  const showTitleRow = Boolean(title || icon || showClose);
   return (
-    <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.md, gap: spacing.md }}>
+    <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: showTitleRow ? spacing.md : spacing.sm, gap: spacing.md }}>
       <View style={{ alignSelf: 'center', width: 44, height: 5, borderRadius: 3, backgroundColor: colors.textSubtle, opacity: 0.45 }} />
-      <Row style={{ gap: spacing.sm }}>
-        {icon ? <Icon name={icon} size={22} color={colors.primary} /> : null}
-        <AppText variant="heading" style={{ flex: 1 }}>
-          {title}
-        </AppText>
-        <IconButton icon="close" label="Close" glass onPress={onClose} />
-      </Row>
+      {showTitleRow ? (
+        <Row style={{ gap: spacing.sm }}>
+          {icon ? <Icon name={icon} size={22} color={colors.primary} /> : null}
+          {title ? (
+            <AppText variant="heading" style={{ flex: 1 }}>
+              {title}
+            </AppText>
+          ) : (
+            <View style={{ flex: 1 }} />
+          )}
+          {showClose ? <IconButton icon="close" label="Close" glass onPress={onClose} /> : null}
+        </Row>
+      ) : null}
     </View>
   );
 }

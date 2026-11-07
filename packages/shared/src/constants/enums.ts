@@ -27,6 +27,33 @@ export const PAYMENT_METHODS = {
 export type PaymentMethod = (typeof PAYMENT_METHODS)[keyof typeof PAYMENT_METHODS];
 export const PAYMENT_METHOD_VALUES = values(PAYMENT_METHODS);
 
+/** Cash / Card / Bank / UPI — the options offered when logging a payment. */
+export const SELECTABLE_PAYMENT_METHODS = [
+  PAYMENT_METHODS.CASH,
+  PAYMENT_METHODS.CARD,
+  PAYMENT_METHODS.BANK,
+  PAYMENT_METHODS.UPI,
+] as const satisfies readonly PaymentMethod[];
+
+/** India signal from what we already store: +91 phone or INR as the home currency. */
+export const isIndianUser = (user: { phone?: string | null; defaultCurrency?: string | null }) =>
+  Boolean(user.phone?.startsWith('+91') || user.defaultCurrency === 'INR');
+
+/** Payment chips for forms. UPI is India-only; `other` is kept for older records only. */
+export const paymentMethodsForUser = (
+  user: { phone?: string | null; defaultCurrency?: string | null },
+  current?: PaymentMethod | null,
+): PaymentMethod[] => {
+  const methods: PaymentMethod[] = isIndianUser(user)
+    ? [...SELECTABLE_PAYMENT_METHODS]
+    : SELECTABLE_PAYMENT_METHODS.filter((m) => m !== PAYMENT_METHODS.UPI);
+  if (current && !methods.includes(current)) methods.push(current);
+  return methods;
+};
+
+export const defaultPaymentMethod = (user: { phone?: string | null; defaultCurrency?: string | null }): PaymentMethod =>
+  isIndianUser(user) ? PAYMENT_METHODS.UPI : PAYMENT_METHODS.CASH;
+
 export const BANK_TXN_DIRECTIONS = { DEBIT: 'debit', CREDIT: 'credit' } as const;
 export type BankTxnDirection = (typeof BANK_TXN_DIRECTIONS)[keyof typeof BANK_TXN_DIRECTIONS];
 export const BANK_TXN_DIRECTION_VALUES = values(BANK_TXN_DIRECTIONS);

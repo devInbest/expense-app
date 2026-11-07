@@ -3,8 +3,16 @@ import { Redirect, router, Stack, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { popup } from '@/components/popup';
-import { fromMinor, PAYMENT_METHOD_VALUES, toMinor, type PaymentMethod, type TransactionType, LIMITS } from '@expense/shared';
-import { AmountInput, CategoryGrid, DateField } from '@/components/finance';
+import {
+  defaultPaymentMethod,
+  fromMinor,
+  paymentMethodsForUser,
+  toMinor,
+  type PaymentMethod,
+  type TransactionType,
+  LIMITS,
+} from '@expense/shared';
+import { AmountInput, CategoryPicker, DateField } from '@/components/finance';
 import { Appear, Button, Chip, ErrorText, Field, Glass, Loading, Row, Screen, Section, Segmented } from '@/components/ui';
 import { useCategories, useLocalQuery } from '@/hooks/data';
 import { trackFeature } from '@/lib/analytics';
@@ -40,7 +48,7 @@ function TransactionFormBody({ existing }: { existing?: LocalTransaction }) {
   const [amount, setAmount] = useState(existing ? String(fromMinor(existing.amount, existing.currency)) : '');
   const [categoryId, setCategoryId] = useState<string | undefined>(existing?.categoryId);
   const [note, setNote] = useState(existing?.note ?? '');
-  const [method, setMethod] = useState<PaymentMethod>(existing?.paymentMethod ?? 'upi');
+  const [method, setMethod] = useState<PaymentMethod>(existing?.paymentMethod ?? defaultPaymentMethod(user));
   const [date, setDate] = useState(() => (existing ? new Date(existing.occurredAt) : new Date()));
   const [receiptUrl, setReceiptUrl] = useState<string | null>(existing?.receiptUrl ?? null);
   const [uploading, setUploading] = useState(false);
@@ -49,6 +57,7 @@ function TransactionFormBody({ existing }: { existing?: LocalTransaction }) {
 
   const currency = existing?.currency ?? user.defaultCurrency;
   const visibleCategories = useMemo(() => categories.filter((c) => c.type === type), [categories, type]);
+  const paymentMethods = useMemo(() => paymentMethodsForUser(user, method), [user, method]);
 
   const save = async () => {
     const minor = toMinor(amount || '0', currency);
@@ -129,18 +138,23 @@ function TransactionFormBody({ existing }: { existing?: LocalTransaction }) {
       </Appear>
 
       <Appear index={1}>
-        <Section title="Category">
-          <CategoryGrid categories={visibleCategories} value={categoryId} onChange={setCategoryId} />
-        </Section>
+        <CategoryPicker categories={visibleCategories} value={categoryId} onChange={setCategoryId} />
       </Appear>
 
       <Appear index={2} style={{ gap: spacing.lg }}>
         <Field label="Note" value={note} onChangeText={setNote} placeholder="What was it for?" maxLength={280} />
 
         <Section title={type === 'income' ? 'Received via' : 'Paid with'}>
-          <Row style={{ flexWrap: 'wrap' }}>
-            {PAYMENT_METHOD_VALUES.map((m) => (
-              <Chip key={m} label={METHOD_LABEL[m]} icon={METHOD_ICON[m]} selected={method === m} onPress={() => setMethod(m)} />
+          <Row>
+            {paymentMethods.map((m) => (
+              <Chip
+                key={m}
+                label={METHOD_LABEL[m]}
+                icon={METHOD_ICON[m]}
+                selected={method === m}
+                onPress={() => setMethod(m)}
+                style={{ flex: 1, justifyContent: 'center', paddingHorizontal: spacing.sm }}
+              />
             ))}
           </Row>
         </Section>

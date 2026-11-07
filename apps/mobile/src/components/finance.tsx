@@ -1,5 +1,5 @@
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { FlatList, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useSafeAreaFrame } from 'react-native-safe-area-context';
 import { formatMoney, getCurrency, type CategoryDTO, type RoomSpendingItemDTO, type TransactionType } from '@expense/shared';
@@ -7,7 +7,7 @@ import { UNKNOWN_CATEGORY } from '@/hooks/data';
 import { formatDate, formatTime } from '@/lib/dates';
 import type { LocalTransaction } from '@/lib/transactions';
 import { radius, spacing, useTheme } from '@/theme';
-import { AppText, Button, CategoryIcon, Field, Icon, Row, SheetFrame, SheetHeader, useFieldBoxStyle } from './ui';
+import { AppText, Button, CategoryIcon, Field, Icon, Row, Section, Sheet, SheetFrame, SheetHeader, useFieldBoxStyle } from './ui';
 
 export function Money({
   amount,
@@ -69,6 +69,70 @@ export function AmountInput({ value, onChange, currency, autoFocus }: { value: s
   );
 }
 
+/** Shown in the compact row. Everything else stays behind "See all". */
+const POPULAR_CATEGORY_KEYS = {
+  expense: ['food', 'groceries', 'transport', 'fuel', 'shopping', 'utilities'],
+  income: ['salary', 'business', 'investment', 'refund'],
+} as const;
+
+function arrangeCategories(categories: CategoryDTO[], value?: string) {
+  const type = categories[0]?.type === 'income' ? 'income' : 'expense';
+  const rank = new Map<string, number>(POPULAR_CATEGORY_KEYS[type].map((key, index) => [key, index]));
+  const popular = categories
+    .flatMap((category) => {
+      const order = category.key ? rank.get(category.key) : undefined;
+      return order == null ? [] : [{ category, order }];
+    })
+    .sort((a, b) => a.order - b.order)
+    .map((item) => item.category);
+  const selected = value ? categories.find((c) => c._id === value) : undefined;
+  const base = popular.length > 0 ? popular : categories.slice(0, 6);
+  const inline = selected && !base.some((c) => c._id === selected._id) ? [selected, ...base] : base;
+  const inlineIds = new Set(inline.map((c) => c._id));
+  return {
+    inline,
+    hiddenCount: categories.filter((c) => !inlineIds.has(c._id)).length,
+  };
+}
+
+function CategoryTile({
+  category,
+  selected,
+  onPress,
+  width,
+}: {
+  category: CategoryDTO;
+  selected: boolean;
+  onPress: () => void;
+  width: number | `${number}%`;
+}) {
+  const { colors } = useTheme();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      accessibilityLabel={category.name}
+      onPress={onPress}
+      style={{
+        width,
+        alignItems: 'center',
+        gap: 4,
+        paddingVertical: spacing.sm + 2,
+        paddingHorizontal: spacing.xs,
+        borderRadius: radius.md,
+        borderWidth: 1.5,
+        borderColor: selected ? category.color : colors.glassBorder,
+        backgroundColor: selected ? `${category.color}1A` : colors.glass,
+        boxShadow: selected ? `0 6px 16px ${category.color}33` : undefined,
+      }}>
+      <CategoryIcon icon={category.icon} color={category.color} size={36} />
+      <AppText variant="caption" numberOfLines={1} style={{ maxWidth: '100%' }}>
+        {category.name}
+      </AppText>
+    </Pressable>
+  );
+}
+
 export function CategoryGrid({
   categories,
   value,
@@ -78,35 +142,80 @@ export function CategoryGrid({
   value?: string;
   onChange: (id: string) => void;
 }) {
-  const { colors } = useTheme();
   return (
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
-      {categories.map((c) => {
-        const selected = c._id === value;
-        return (
-          <Pressable
-            key={c._id}
-            onPress={() => onChange(c._id)}
-            style={{
-              width: '23%',
-              alignItems: 'center',
-              gap: 4,
-              paddingVertical: spacing.sm + 2,
-              borderRadius: radius.md,
-              borderWidth: 1.5,
-              borderColor: selected ? c.color : colors.glassBorder,
-              backgroundColor: selected ? `${c.color}1A` : colors.glass,
-              boxShadow: selected ? `0 6px 16px ${c.color}33` : undefined,
-              transform: [{ scale: selected ? 1.04 : 1 }],
-            }}>
-            <CategoryIcon icon={c.icon} color={c.color} size={36} />
-            <AppText variant="caption" numberOfLines={1} style={{ maxWidth: '90%' }}>
-              {c.name}
+      {categories.map((c) => (
+        <CategoryTile key={c._id} category={c} selected={c._id === value} onPress={() => onChange(c._id)} width="23%" />
+      ))}
+    </View>
+  );
+}
+
+/** One row of popular categories. "See all" opens the full list. */
+export function CategoryPicker({
+  categories,
+  value,
+  onChange,
+  title = 'Category',
+}: {
+  categories: CategoryDTO[];
+  value?: string;
+  onChange: (id: string) => void;
+  title?: string;
+}) {
+  const { colors } = useTheme();
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const { inline, hiddenCount } = useMemo(() => arrangeCategories(categories, value), [categories, value]);
+  const q = query.trim().toLowerCase();
+  const visible = q ? categories.filter((c) => c.name.toLowerCase().includes(q)) : categories;
+  const close = () => {
+    setOpen(false);
+    setQuery('');
+  };
+  const choose = (id: string) => {
+    onChange(id);
+    close();
+  };
+
+  return (
+    <Section
+      title={title}
+      action={
+        hiddenCount > 0 ? (
+          <Pressable hitSlop={8} accessibilityRole="button" accessibilityLabel="See all categories" onPress={() => setOpen(true)}>
+            <AppText variant="caption" color={colors.primary} style={{ fontWeight: '600' }}>
+              See all
             </AppText>
           </Pressable>
-        );
-      })}
-    </View>
+        ) : null
+      }>
+      <ScrollView
+        horizontal
+        nestedScrollEnabled
+        showsHorizontalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        style={{ flexGrow: 0 }}
+        contentContainerStyle={{ gap: spacing.sm, paddingVertical: spacing.xs }}>
+        {inline.map((c) => (
+          <CategoryTile key={c._id} category={c} selected={c._id === value} onPress={() => onChange(c._id)} width={84} />
+        ))}
+      </ScrollView>
+      <Sheet visible={open} showClose={false} dragToDismiss onClose={close}>
+        {categories.length > 8 ? (
+          <Field placeholder="Search categories" value={query} onChangeText={setQuery} autoCorrect={false} autoCapitalize="none" />
+        ) : null}
+        <View style={{ paddingBottom: spacing.xl }}>
+          {visible.length ? (
+            <CategoryGrid categories={visible} value={value} onChange={choose} />
+          ) : (
+            <AppText muted style={{ textAlign: 'center' }}>
+              No categories match
+            </AppText>
+          )}
+        </View>
+      </Sheet>
+    </Section>
   );
 }
 

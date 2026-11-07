@@ -5,20 +5,22 @@ import { Pressable, ScrollView, TextInput, View } from 'react-native';
 import { qk } from '@expense/api-client';
 import {
   computeSplits,
+  defaultPaymentMethod,
   formatMoney,
   fromMinor,
-  PAYMENT_METHOD_VALUES,
+  paymentMethodsForUser,
   toMinor,
   type PaymentMethod,
   type RoomExpenseDTO,
   type SplitType,
 } from '@expense/shared';
-import { AmountInput, CategoryGrid, DateField } from '@/components/finance';
+import { AmountInput, CategoryPicker, DateField } from '@/components/finance';
 import { AppText, Avatar, Banner, Button, Card, Chip, ErrorText, Field, Icon, Loading, Row, Screen, Section, Segmented } from '@/components/ui';
 import { useCategories } from '@/hooks/data';
 import { useRoom } from '@/hooks/rooms';
 import { trackFeature } from '@/lib/analytics';
 import { api, errorMessage } from '@/lib/api';
+import { useUser } from '@/lib/auth';
 import { radius, spacing, useTheme } from '@/theme';
 
 const METHOD_LABEL: Record<PaymentMethod, string> = { cash: 'Cash', upi: 'UPI', card: 'Card', bank: 'Bank', other: 'Other' };
@@ -32,6 +34,7 @@ const SPLIT_OPTIONS: { value: SplitType; label: string }[] = [
 export default function RoomExpenseForm() {
   const { id, expenseId, bankTxnId } = useLocalSearchParams<{ id: string; expenseId?: string; bankTxnId?: string }>();
   const { colors } = useTheme();
+  const user = useUser();
   const queryClient = useQueryClient();
   const { categories } = useCategories();
   const r = useRoom(id);
@@ -59,9 +62,10 @@ export default function RoomExpenseForm() {
   const [splitType, setSplitType] = useState<SplitType>('equal');
   const [included, setIncluded] = useState<Set<string>>(new Set());
   const [values, setValues] = useState<Record<string, string>>({});
-  const [method, setMethod] = useState<PaymentMethod>('upi');
+  const [method, setMethod] = useState<PaymentMethod>(() => defaultPaymentMethod(user));
   const [error, setError] = useState<string | null>(null);
   const [initialised, setInitialised] = useState(false);
+  const paymentMethods = useMemo(() => paymentMethodsForUser(user, method), [user, method]);
 
   useEffect(() => {
     if (!room || initialised || (bankTxnId && !bankTxn.data)) return;
@@ -82,7 +86,7 @@ export default function RoomExpenseForm() {
       setDate(new Date(existing.occurredAt));
       setSplitType(existing.splitType);
       setIncluded(new Set(existing.splits.map((s) => s.userId)));
-      setMethod(existing.paymentMethod ?? 'upi');
+      setMethod(existing.paymentMethod ?? defaultPaymentMethod(user));
       setValues(
         Object.fromEntries(existing.splits.map((s) => [s.userId, String(existing.splitType === 'exact' ? fromMinor(s.amount, currency) : s.share)])),
       );
@@ -90,7 +94,7 @@ export default function RoomExpenseForm() {
       setIncluded(new Set(r.active.map((m) => m.user._id)));
     }
     setInitialised(true);
-  }, [room, existing, initialised, r.active, bankTxnId, bankTxn.data]);
+  }, [room, existing, initialised, r.active, bankTxnId, bankTxn.data, user]);
 
   // Members who left still appear if they're part of an existing expense.
   const people = useMemo(() => {
@@ -192,13 +196,11 @@ export default function RoomExpenseForm() {
         <AmountInput value={amount} onChange={setAmount} currency={currency} autoFocus={!existing} />
       )}
 
-      <Section title="Category">
-        <CategoryGrid
-          categories={categories.filter((c) => c.type === 'expense')}
-          value={categoryId}
-          onChange={(cid) => setCategoryId((cur) => (cur === cid ? undefined : cid))}
-        />
-      </Section>
+      <CategoryPicker
+        categories={categories.filter((c) => c.type === 'expense')}
+        value={categoryId}
+        onChange={(cid) => setCategoryId((cur) => (cur === cid ? undefined : cid))}
+      />
 
       <Field label="Description" value={note} onChangeText={setNote} placeholder="e.g. Dinner at Toit" maxLength={280} />
 
@@ -213,9 +215,15 @@ export default function RoomExpenseForm() {
       </Section>
 
       <Section title="Paid with">
-        <Row style={{ flexWrap: 'wrap' }}>
-          {PAYMENT_METHOD_VALUES.map((m) => (
-            <Chip key={m} label={METHOD_LABEL[m]} selected={method === m} onPress={() => setMethod(m)} />
+        <Row>
+          {paymentMethods.map((m) => (
+            <Chip
+              key={m}
+              label={METHOD_LABEL[m]}
+              selected={method === m}
+              onPress={() => setMethod(m)}
+              style={{ flex: 1, justifyContent: 'center', paddingHorizontal: spacing.sm }}
+            />
           ))}
         </Row>
       </Section>
