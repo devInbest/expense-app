@@ -10,7 +10,10 @@ export interface LocalTransaction {
   currency: string;
   categoryId: string;
   note: string;
+  recipient: string;
   paymentMethod: PaymentMethod;
+  /** Saved bank account / card id; empty when none chosen. */
+  accountId: string;
   occurredAt: string;
   receiptUrl: string | null;
   tags: string[];
@@ -29,7 +32,9 @@ export interface TransactionRow {
   currency: string;
   category_id: string;
   note: string;
+  recipient: string;
   payment_method: PaymentMethod;
+  account_id: string;
   occurred_at: string;
   receipt_url: string | null;
   tags: string;
@@ -44,7 +49,7 @@ export interface TransactionRow {
 export type TransactionInput = Pick<
   LocalTransaction,
   'type' | 'amount' | 'currency' | 'categoryId' | 'note' | 'paymentMethod' | 'occurredAt'
-> & { receiptUrl?: string | null; tags?: string[] };
+> & { recipient?: string; accountId?: string; receiptUrl?: string | null; tags?: string[] };
 
 // ---------- change notifications ----------
 const listeners = new Set<() => void>();
@@ -76,7 +81,9 @@ export const fromRow = (r: TransactionRow): LocalTransaction => ({
   currency: r.currency,
   categoryId: r.category_id,
   note: r.note,
+  recipient: r.recipient ?? '',
   paymentMethod: r.payment_method,
+  accountId: r.account_id ?? '',
   occurredAt: r.occurred_at,
   receiptUrl: r.receipt_url,
   tags: JSON.parse(r.tags || '[]') as string[],
@@ -100,7 +107,9 @@ export const toSyncChange = (r: TransactionRow): SyncChange => ({
           currency: r.currency,
           categoryId: r.category_id,
           note: r.note,
+          recipient: r.recipient ?? '',
           paymentMethod: r.payment_method,
+          accountId: r.account_id ?? '',
           occurredAt: r.occurred_at,
           receiptUrl: r.receipt_url ?? '',
           tags: JSON.parse(r.tags || '[]') as string[],
@@ -108,12 +117,13 @@ export const toSyncChange = (r: TransactionRow): SyncChange => ({
 });
 
 const UPSERT_SERVER_SQL = `
-  INSERT INTO transactions (client_id, server_id, type, amount, currency, category_id, note, payment_method,
-    occurred_at, receipt_url, tags, recurring_id, binned, deleted, dirty, client_updated_at, sync_error)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, NULL)
+  INSERT INTO transactions (client_id, server_id, type, amount, currency, category_id, note, recipient, payment_method,
+    account_id, occurred_at, receipt_url, tags, recurring_id, binned, deleted, dirty, client_updated_at, sync_error)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, NULL)
   ON CONFLICT (client_id) DO UPDATE SET
     server_id = excluded.server_id, type = excluded.type, amount = excluded.amount, currency = excluded.currency,
-    category_id = excluded.category_id, note = excluded.note, payment_method = excluded.payment_method,
+    category_id = excluded.category_id, note = excluded.note, recipient = excluded.recipient, payment_method = excluded.payment_method,
+    account_id = excluded.account_id,
     occurred_at = excluded.occurred_at, receipt_url = excluded.receipt_url, tags = excluded.tags,
     recurring_id = excluded.recurring_id, binned = excluded.binned, deleted = 0, dirty = 0,
     client_updated_at = excluded.client_updated_at, sync_error = NULL
@@ -127,7 +137,9 @@ const serverParams = (t: TransactionDTO) => [
   t.currency,
   t.categoryId,
   t.note ?? '',
+  t.recipient ?? '',
   t.paymentMethod,
+  t.accountId ?? '',
   t.occurredAt,
   t.receiptUrl ?? null,
   JSON.stringify(t.tags ?? []),
@@ -182,8 +194,9 @@ const buildWhere = (f: TransactionFilter) => {
     params.push(f.paymentMethod);
   }
   if (f.search) {
-    clauses.push('note LIKE ?');
-    params.push(`%${f.search.replace(/[%_]/g, '')}%`);
+    clauses.push('(note LIKE ? OR recipient LIKE ?)');
+    const like = `%${f.search.replace(/[%_]/g, '')}%`;
+    params.push(like, like);
   }
   return { where: clauses.join(' AND '), params };
 };
@@ -271,16 +284,18 @@ export const countUnsynced = async () => {
 export const createTransaction = async (input: TransactionInput) => {
   const clientId = Crypto.randomUUID();
   await db.runAsync(
-    `INSERT INTO transactions (client_id, type, amount, currency, category_id, note, payment_method, occurred_at,
-      receipt_url, tags, deleted, dirty, client_updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 1, ?)`,
+    `INSERT INTO transactions (client_id, type, amount, currency, category_id, note, recipient, payment_method, account_id,
+      occurred_at, receipt_url, tags, deleted, dirty, client_updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 1, ?)`,
     clientId,
     input.type,
     input.amount,
     input.currency,
     input.categoryId,
     input.note,
+    input.recipient?.trim() ?? '',
     input.paymentMethod,
+    input.accountId ?? '',
     input.occurredAt,
     input.receiptUrl ?? null,
     JSON.stringify(input.tags ?? []),
@@ -292,7 +307,7 @@ export const createTransaction = async (input: TransactionInput) => {
 
 export const updateTransaction = async (clientId: string, input: TransactionInput) => {
   await db.runAsync(
-    `UPDATE transactions SET type = ?, amount = ?, currency = ?, category_id = ?, note = ?, payment_method = ?,
+    `UPDATE transactions SET type = ?, amount = ?, currency = ?, category_id = ?, note = ?, recipient = ?, payment_method = ?, account_id = ?,
       occurred_at = ?, receipt_url = ?, tags = ?, dirty = 1, sync_error = NULL, client_updated_at = ?
      WHERE client_id = ?`,
     input.type,
@@ -300,7 +315,9 @@ export const updateTransaction = async (clientId: string, input: TransactionInpu
     input.currency,
     input.categoryId,
     input.note,
+    input.recipient?.trim() ?? '',
     input.paymentMethod,
+    input.accountId ?? '',
     input.occurredAt,
     input.receiptUrl ?? null,
     JSON.stringify(input.tags ?? []),

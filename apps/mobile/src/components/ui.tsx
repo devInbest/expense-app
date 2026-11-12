@@ -1355,43 +1355,88 @@ export function OverlayScrim({ style, onPress }: { style?: object; onPress?: () 
   );
 }
 
-type SheetDragControls = { dragY: SharedValue<number>; atTop: SharedValue<boolean>; onClose: () => void };
+type SheetDragControls = {
+  dragY: SharedValue<number>;
+  atTop: SharedValue<boolean>;
+  onClose: () => void;
+  /** Present when the sheet can be pulled up to full screen: progress 0 = natural height, 1 = full screen. */
+  expand?: { progress: SharedValue<number>; baseHeight: SharedValue<number>; fullHeight: number };
+};
 
 const SheetDragContext = createContext<SheetDragControls | null>(null);
 
-/** Pull the sheet down to close. Upward movement stays with the list. */
+const EXPAND_TIMING = { duration: 240, easing: Easing.out(Easing.cubic) };
+
+/**
+ * Pull the sheet down to close. Upward movement stays with the list, unless the sheet is
+ * expandable: then pulling up grows it to full screen, and pulling down shrinks it back first.
+ */
 function DismissibleSheet({ header, children }: { header: ReactNode; children: ReactNode }) {
   const drag = useContext(SheetDragContext);
   const dragY = drag?.dragY;
   const atTop = drag?.atTop;
   const closeSheet = drag?.onClose;
+  const expand = drag?.expand;
+  const startExpanded = useSharedValue(0);
   const native = useNativeGesture();
   const pan = usePanGesture(
     useMemo(
       () => ({
         enabled: atTop,
         simultaneousWith: native,
-        activeOffsetY: [-10000, 12] as [number, number],
-        failOffsetY: [-16, 10000] as [number, number],
+        activeOffsetY: (expand ? [-12, 12] : [-10000, 12]) as [number, number],
+        ...(expand ? {} : { failOffsetY: [-16, 10000] as [number, number] }),
         failOffsetX: [-28, 28] as [number, number],
         cancelsTouchesInView: true,
+        onActivate: () => {
+          'worklet';
+          startExpanded.set(expand ? expand.progress.get() : 0);
+        },
         onUpdate: (event: PanGestureActiveEvent) => {
           'worklet';
           if (!dragY || !atTop?.get()) return;
-          dragY.set(Math.max(0, event.translationY));
+          const ty = event.translationY;
+          if (expand) {
+            const room = Math.max(1, expand.fullHeight - expand.baseHeight.get());
+            if (startExpanded.get() >= 1) {
+              expand.progress.set(1 - Math.min(1, Math.max(0, ty) / room));
+              return;
+            }
+            if (ty < 0) {
+              expand.progress.set(Math.min(1, -ty / room));
+              dragY.set(0);
+              return;
+            }
+            expand.progress.set(0);
+          }
+          dragY.set(Math.max(0, ty));
         },
         onDeactivate: (event: PanGestureActiveEvent) => {
           'worklet';
           if (!dragY || !closeSheet) return;
-          const y = atTop?.get() ? Math.max(0, event.translationY) : 0;
-          if (y > 90 || (atTop?.get() && event.velocityY > 800)) {
+          const top = atTop?.get() ?? true;
+          const ty = event.translationY;
+          const vy = event.velocityY;
+          if (expand) {
+            if (startExpanded.get() >= 1) {
+              const collapse = top && (ty > 80 || vy > 800);
+              expand.progress.set(withTiming(collapse ? 0 : 1, EXPAND_TIMING));
+              return;
+            }
+            if (ty < 0) {
+              expand.progress.set(withTiming(ty < -60 || vy < -800 ? 1 : 0, EXPAND_TIMING));
+              return;
+            }
+          }
+          const y = top ? Math.max(0, ty) : 0;
+          if (y > 90 || (top && vy > 800)) {
             scheduleOnRN(closeSheet);
             return;
           }
           dragY.set(withTiming(0, { duration: 180 }));
         },
       }),
-      [atTop, closeSheet, dragY, native],
+      [atTop, closeSheet, dragY, expand, native, startExpanded],
     ),
   );
   const { height } = useSafeAreaFrame();
@@ -1439,6 +1484,7 @@ export function SheetFrame({
   onHidden,
   dismissOnScrim = false,
   dragToDismiss = false,
+  expandable = false,
   children,
 }: {
   visible: boolean;
@@ -1447,33 +1493,71 @@ export function SheetFrame({
   dismissOnScrim?: boolean;
   /** Header can be pulled down to close. */
   dragToDismiss?: boolean;
+  /** With `dragToDismiss`: pull up to grow to full screen, pull down to shrink back, then again to close. */
+  expandable?: boolean;
   children: ReactNode;
 }) {
   const insets = useSafeAreaInsets();
+  const { height: screenHeight } = useSafeAreaFrame();
   const dragY = useSharedValue(0);
   const atTop = useSharedValue(true);
+  const expandProgress = useSharedValue(0);
+  const baseHeight = useSharedValue(0);
+  const bottomPad = Math.max(insets.bottom, spacing.sm);
+  /** Content height when fully expanded (the sheet's own padding sits outside it). */
+  const fullHeight = screenHeight * 0.94 - bottomPad;
+  const canExpand = dragToDismiss && expandable;
   const onCloseRef = useRef(onClose);
   useEffect(() => {
     onCloseRef.current = onClose;
   }, [onClose]);
   const close = useCallback(() => onCloseRef.current(), []);
-  const dragControls = useMemo(() => ({ dragY, atTop, onClose: close }), [dragY, atTop, close]);
+  const dragControls = useMemo<SheetDragControls>(
+    () => ({
+      dragY,
+      atTop,
+      onClose: close,
+      expand: canExpand ? { progress: expandProgress, baseHeight, fullHeight } : undefined,
+    }),
+    [dragY, atTop, close, canExpand, expandProgress, baseHeight, fullHeight],
+  );
   const { mounted, scrimStyle, sheetStyle } = useOverlayMotion(visible, onHidden, dragY);
+  // Only the content wrapper grows, and only while pulled up: collapsed, the sheet hugs its content.
+  const expandStyle = useAnimatedStyle(() => {
+    const p = expandProgress.get();
+    if (p <= 0) return { minHeight: 0 };
+    const base = baseHeight.get();
+    return { minHeight: base + Math.max(0, fullHeight - base) * p };
+  });
 
   useLayoutEffect(() => {
     if (visible) {
       dragY.set(0);
       atTop.set(true);
+      expandProgress.set(0);
     }
-  }, [visible, dragY, atTop]);
+  }, [visible, dragY, atTop, expandProgress]);
 
   const frame = (
     <View style={{ flex: 1 }}>
       <OverlayScrim style={scrimStyle} onPress={dismissOnScrim ? onClose : undefined} />
       <KeyboardAvoidingView behavior="padding" pointerEvents="box-none" style={{ flex: 1, justifyContent: 'flex-end' }}>
         <Animated.View style={[{ width: '100%', maxHeight: '94%' }, sheetStyle]}>
-          <FrostedSurface edge="top" style={{ paddingBottom: Math.max(insets.bottom, spacing.sm) }}>
-            <SheetDragContext.Provider value={dragToDismiss ? dragControls : null}>{children}</SheetDragContext.Provider>
+          <FrostedSurface edge="top" style={{ paddingBottom: bottomPad }}>
+            <SheetDragContext.Provider value={dragToDismiss ? dragControls : null}>
+              {canExpand ? (
+                <Animated.View
+                  style={expandStyle}
+                  onLayout={(e) => {
+                    // Natural height, measured while collapsed; the expanded height grows from here.
+                    if (expandProgress.get() === 0) baseHeight.set(e.nativeEvent.layout.height);
+                  }}>
+                  {children}
+                </Animated.View>
+              ) : (
+                children
+              )}
+            </SheetDragContext.Provider>
           </FrostedSurface>
         </Animated.View>
       </KeyboardAvoidingView>
@@ -1494,6 +1578,7 @@ export function Sheet({
   onClose,
   showClose = true,
   dragToDismiss = false,
+  expandable = false,
   children,
 }: {
   visible: boolean;
@@ -1504,13 +1589,15 @@ export function Sheet({
   showClose?: boolean;
   /** Pull the header down to close. */
   dragToDismiss?: boolean;
+  /** With `dragToDismiss`: pull up to go full screen. */
+  expandable?: boolean;
   children: ReactNode;
 }) {
   const { height } = useSafeAreaFrame();
   const { scrollY, onScroll } = useRevealScroll();
   const header = <SheetHeader title={title} icon={icon} onClose={onClose} showClose={showClose} />;
   return (
-    <SheetFrame visible={visible} onClose={onClose} dismissOnScrim dragToDismiss={dragToDismiss}>
+    <SheetFrame visible={visible} onClose={onClose} dismissOnScrim dragToDismiss={dragToDismiss} expandable={expandable}>
       {dragToDismiss ? (
         <DismissibleSheet header={header}>{children}</DismissibleSheet>
       ) : (

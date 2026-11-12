@@ -15,6 +15,7 @@ import { linkPhoneInvitesToUser } from '../rooms/invite.service';
 import { removeUserFromAllRooms } from '../rooms/room.service';
 import { RoomInvite } from '../rooms/room.models';
 import { Transaction } from '../transactions/transaction.model';
+import { Transfer } from '../transfers/transfer.model';
 import { User, type UserDoc } from './user.model';
 
 export const updateProfile = async (user: UserDoc, input: UpdateProfileInput) => {
@@ -92,6 +93,7 @@ export const deleteAccount = async (user: UserDoc, req: Request) => {
     MerchantRule.deleteMany({ userId }),
     Budget.deleteMany({ ownerType: 'user', ownerId: userId }),
     RecurringRule.deleteMany({ ownerType: 'user', ownerId: userId }),
+    Transfer.deleteMany({ userId }),
     Category.deleteMany({ ownerType: 'user', ownerId: userId }),
     Device.deleteMany({ userId }),
     Notification.deleteMany({ userId }),

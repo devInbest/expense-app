@@ -16,6 +16,7 @@ import type {
   CreateRoomExpenseInput,
   CreateRoomInput,
   CreateTransactionInput,
+  CreateTransferInput,
   CursorPage,
   DeviceInfo,
   ExportQuery,
@@ -50,10 +51,12 @@ import type {
   SyncPushResult,
   TrackEventsInput,
   TransactionDTO,
+  TransferDTO,
   UpdateProfileInput,
   UpdateRoomExpenseInput,
   UpdateRoomInput,
   UpdateTransactionInput,
+  UpdateTransferInput,
   UploadSignResult,
   UserDTO,
 } from '@expense/shared';
@@ -146,6 +149,14 @@ export const createCustomerApi = (http: AxiosInstance) => {
       create: (body: CreateRecurringInput) => post<RecurringRuleDTO>('/recurring', body),
       update: (id: string, body: Params) => patch<RecurringRuleDTO>(`/recurring/${id}`, body),
       remove: (id: string) => del<null>(`/recurring/${id}`),
+    },
+
+    transfers: {
+      list: (params?: { from?: string; to?: string }) => get<TransferDTO[]>('/transfers', params),
+      get: (id: string) => get<TransferDTO>(`/transfers/${id}`),
+      create: (body: CreateTransferInput) => post<TransferDTO>('/transfers', body),
+      update: (id: string, body: UpdateTransferInput) => patch<TransferDTO>(`/transfers/${id}`, body),
+      remove: (id: string) => del<null>(`/transfers/${id}`),
     },
 
     insights: {

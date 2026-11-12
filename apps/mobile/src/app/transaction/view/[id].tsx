@@ -6,6 +6,7 @@ import { formatMoney, type PaymentMethod } from '@expense/shared';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppText, Appear, BackdropSlice, Banner, Button, Card, Divider, Glass, Icon, Loading, Row, Screen, TAB_BAR_FADE } from '@/components/ui';
 import { UNKNOWN_CATEGORY, useCategories, useLocalQuery } from '@/hooks/data';
+import { accountLabel, useAccounts } from '@/lib/accounts';
 import { errorMessage } from '@/lib/api';
 import { shareReceipt } from '@/lib/receipt';
 import { getTransaction, setTransactionBinned } from '@/lib/transactions';
@@ -32,6 +33,7 @@ export default function TransactionView() {
   const { byId } = useCategories();
   const { data: tx } = useLocalQuery(() => getTransaction(id), [id]);
   const [sharing, setSharing] = useState(false);
+  const accounts = useAccounts();
   const insets = useSafeAreaInsets();
   const [screenHeight, setScreenHeight] = useState(0);
 
@@ -49,6 +51,7 @@ export default function TransactionView() {
   const tone = isIncome ? colors.income : colors.danger;
   const when = new Date(tx.occurredAt);
   const method = METHOD_LABEL[tx.paymentMethod] ?? tx.paymentMethod;
+  const account = tx.accountId ? accounts.find((a) => a.id === tx.accountId) : undefined;
   const amount = formatMoney(tx.amount, tx.currency);
 
   const download = async () => {
@@ -128,7 +131,8 @@ export default function TransactionView() {
               Transaction details
             </AppText>
             <DetailRow label="Category" value={cat.name} />
-            <DetailRow label={isIncome ? 'Received via' : 'Paid with'} value={method} />
+            {tx.recipient ? <DetailRow label="Paid To" value={tx.recipient} /> : null}
+            <DetailRow label={isIncome ? 'Received via' : 'Paid with'} value={account ? `${method} · ${accountLabel(account)}` : method} />
             <DetailRow label="Time" value={when.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })} />
             <DetailRow label="Date" value={when.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })} />
             {tx.note ? (

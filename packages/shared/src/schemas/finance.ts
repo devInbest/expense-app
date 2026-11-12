@@ -38,7 +38,11 @@ const transactionFields = {
   currency: currencySchema.optional(),
   categoryId: objectIdSchema,
   note: noteSchema,
+  /** Who was paid (or who paid, for income). Optional; prefilled from bank transactions. */
+  recipient: z.string().trim().max(LIMITS.MAX_RECIPIENT_LENGTH).optional().default(''),
   paymentMethod: z.enum(PAYMENT_METHOD_VALUES).default('upi'),
+  /** Saved bank account or card (see `UserDTO.accounts`) it was paid with. Empty when not chosen. */
+  accountId: z.string().trim().max(64).optional().default(''),
   occurredAt: dateSchema,
   receiptUrl: z.string().url().optional().or(z.literal('')),
   tags: z.array(z.string().trim().min(1).max(24)).max(10).default([]),

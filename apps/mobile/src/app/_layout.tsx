@@ -106,7 +106,10 @@ function AppNavigator({ signedIn, onboarded }: { signedIn: boolean; onboarded: b
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen name="profile" options={{ title: 'Profile' }} />
             <Stack.Screen name="upi" options={{ title: 'UPI ID' }} />
+            <Stack.Screen name="accounts" options={{ title: 'Accounts' }} />
+            <Stack.Screen name="transfers" options={{ title: 'Self Transfer' }} />
             <Stack.Screen name="transaction/[id]" options={{ presentation: 'modal', title: 'Transaction' }} />
+            <Stack.Screen name="transfer/[id]" options={{ presentation: 'modal', title: 'Self transfer' }} />
             <Stack.Screen name="transaction/view/[id]" options={{ title: 'Transaction' }} />
             <Stack.Screen name="bin" options={{ title: 'Bin' }} />
             <Stack.Screen name="budgets" options={{ title: 'Budgets' }} />

@@ -18,7 +18,7 @@ import {
   type TransactionType,
 } from '@expense/shared';
 import { bankTxnSource, bankTxnTitle, LINK_LABEL } from '@/components/BankTxnRow';
-import { AmountInput, CategoryGrid } from '@/components/finance';
+import { AccountPicker, AmountInput, CategoryPicker } from '@/components/finance';
 import {
   AppText,
   Appear,
@@ -41,6 +41,7 @@ import {
 } from '@/components/ui';
 import { UNKNOWN_CATEGORY, useCategories } from '@/hooks/data';
 import { useRoom } from '@/hooks/rooms';
+import { accountsForMethod, defaultAccountId, useAccounts } from '@/lib/accounts';
 import { trackFeature } from '@/lib/analytics';
 import { api, errorMessage } from '@/lib/api';
 import { useUser } from '@/lib/auth';
@@ -178,7 +179,11 @@ function PersonalForm({ item }: { item: BankTransactionDTO }) {
   const type: TransactionType = item.direction === 'credit' ? 'income' : 'expense';
   const [amount, setAmount] = useState(String(fromMinor(item.amount, item.currency)));
   const [categoryId, setCategoryId] = useState<string | undefined>(item.suggestion?.categoryId);
-  const [note, setNote] = useState(item.counterparty);
+  const [recipient, setRecipient] = useState(item.counterparty ?? '');
+  const [note, setNote] = useState('');
+  const savedAccounts = useAccounts();
+  const accountOptions = useMemo(() => accountsForMethod(savedAccounts, item.paymentMethod), [savedAccounts, item.paymentMethod]);
+  const [accountId, setAccountId] = useState(() => defaultAccountId(accountOptions, item.accountMask));
   const [error, setError] = useState<string | null>(null);
   const visible = useMemo(() => categories.filter((c) => c.type === type), [categories, type]);
   const selected = visible.some((c) => c._id === categoryId) ? categoryId : undefined;
@@ -198,7 +203,9 @@ function PersonalForm({ item }: { item: BankTransactionDTO }) {
           currency: item.currency as CreateTransactionInput['currency'],
           categoryId: selected,
           note: note.trim(),
+          recipient: recipient.trim(),
           paymentMethod: item.paymentMethod,
+          accountId: accountOptions.some((a) => a.id === accountId) ? accountId : '',
           occurredAt: item.occurredAt,
           tags: [],
         },
@@ -218,15 +225,27 @@ function PersonalForm({ item }: { item: BankTransactionDTO }) {
   return (
     <>
       <AmountInput value={amount} onChange={setAmount} currency={item.currency} />
-      <Section title="Category">
-        {item.suggestion && selected === item.suggestion.categoryId ? (
-          <AppText variant="caption" muted>
-            Suggested from the last time you paid {item.counterparty}
-          </AppText>
-        ) : null}
-        <CategoryGrid categories={visible} value={selected} onChange={setCategoryId} />
-      </Section>
+      <CategoryPicker
+        categories={visible}
+        value={selected}
+        onChange={setCategoryId}
+        hint={
+          item.suggestion && selected === item.suggestion.categoryId ? (
+            <AppText variant="caption" muted>
+              Suggested from the last time you paid {item.counterparty}
+            </AppText>
+          ) : null
+        }
+      />
+      <Field
+        label="Paid To"
+        value={recipient}
+        onChangeText={setRecipient}
+        placeholder="Recipient name"
+        maxLength={LIMITS.MAX_RECIPIENT_LENGTH}
+      />
       <Field label="Note" value={note} onChangeText={setNote} placeholder="What was it for?" maxLength={280} />
+      <AccountPicker accounts={accountOptions} value={accountId} onChange={setAccountId} />
       <ErrorText>{error}</ErrorText>
       <Button title={type === 'income' ? 'Save as Income' : 'Save as Expense'} icon="check" loading={save.isPending} onPress={() => save.mutate()} />
     </>

@@ -37,6 +37,12 @@ const MIGRATIONS: string[] = [
   ALTER TABLE transactions ADD COLUMN binned INTEGER NOT NULL DEFAULT 0;
   UPDATE transactions SET deleted = 0, binned = 1, sync_error = NULL WHERE deleted = 1;
   `,
+  `
+  ALTER TABLE transactions ADD COLUMN recipient TEXT NOT NULL DEFAULT '';
+  `,
+  `
+  ALTER TABLE transactions ADD COLUMN account_id TEXT NOT NULL DEFAULT '';
+  `,
 ];
 
 let ready: Promise<void> | null = null;

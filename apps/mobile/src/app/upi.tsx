@@ -1,6 +1,7 @@
 import { useMutation } from '@tanstack/react-query';
 import * as Clipboard from 'expo-clipboard';
 import { useEffect, useState } from 'react';
+import { View } from 'react-native';
 import { isUpiNumber, upiIdSchema } from '@expense/shared';
 import { QrCode } from '@/components/QrCode';
 import { AppText, Appear, Banner, Button, Card, ErrorText, Field, Glass, IconButton, Row, Screen, Sheet } from '@/components/ui';
@@ -107,7 +108,7 @@ function UpiSheet({ visible, onClose }: { visible: boolean; onClose: () => void 
   };
 
   return (
-    <Sheet visible={visible} title="UPI ID" onClose={onClose}>
+    <Sheet visible={visible} title="UPI ID" showClose={false} dragToDismiss onClose={onClose}>
       <Field
         label="UPI ID"
         hint="Find it in your UPI app's profile. Room members can then pay you in one tap."
@@ -118,11 +119,16 @@ function UpiSheet({ visible, onClose }: { visible: boolean; onClose: () => void 
         autoCorrect={false}
         keyboardType="email-address"
         maxLength={100}
-        autoFocus
       />
       <ErrorText>{error}</ErrorText>
-      <Button title="Save" loading={save.isPending && save.variables !== ''} onPress={() => submit(value.trim())} />
+      <Button
+        title="Save"
+        loading={save.isPending && save.variables !== ''}
+        disabled={Boolean(user.upiId) && value.trim() === user.upiId}
+        onPress={() => submit(value.trim())}
+      />
       {user.upiId ? <Button title="Remove" variant="ghost" loading={save.isPending && save.variables === ''} onPress={() => submit('')} /> : null}
+      <View style={{ height: spacing.lg }} />
     </Sheet>
   );
 }

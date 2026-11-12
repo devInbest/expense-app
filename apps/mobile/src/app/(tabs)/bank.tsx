@@ -16,7 +16,7 @@ import { isSmsImportEnabled, requestSmsPermission, scanBankSms, SMS_ACCESS_KEY, 
 import { radius, spacing, useTheme } from '@/theme';
 
 const TABS: { value: BankTxnStatus; label: string }[] = [
-  { value: 'pending', label: 'Unreviewed' },
+  { value: 'pending', label: 'Unmarked' },
   { value: 'linked', label: 'Marked' },
   { value: 'ignored', label: 'Ignored' },
 ];

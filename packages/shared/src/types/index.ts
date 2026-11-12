@@ -19,7 +19,7 @@ import type {
   TransactionType,
   UserStatus,
 } from '../constants/enums';
-import type { NotificationPrefs } from '../schemas/user';
+import type { NotificationPrefs, PaymentAccount } from '../schemas/user';
 import type { RoomSettings } from '../schemas/room';
 import type { Debt } from '../money/balances';
 
@@ -76,6 +76,8 @@ export interface UserDTO {
   notificationPrefs: NotificationPrefs;
   /** UPI ID or UPI number for receiving payments from room members. */
   upiId?: string;
+  /** Saved bank accounts and cards, offered when logging a bank or card payment. */
+  accounts: PaymentAccount[];
   createdAt: ISODate;
 }
 
@@ -154,7 +156,9 @@ export interface TransactionDTO {
   currency: string;
   categoryId: string;
   note: string;
+  recipient: string;
   paymentMethod: PaymentMethod;
+  accountId?: string;
   occurredAt: ISODate;
   receiptUrl?: string;
   tags: string[];
@@ -163,6 +167,19 @@ export interface TransactionDTO {
   deletedAt?: ISODate | null;
   /** Moved to the bin: hidden from lists and totals until restored. */
   binnedAt?: ISODate | null;
+  createdAt: ISODate;
+  updatedAt: ISODate;
+}
+
+/** Self transfer between cash, bank accounts and cards. `fromAccount` / `toAccount` are `cash` or a saved account id. */
+export interface TransferDTO {
+  _id: string;
+  amount: number;
+  currency: string;
+  fromAccount: string;
+  toAccount: string;
+  occurredAt: ISODate;
+  note: string;
   createdAt: ISODate;
   updatedAt: ISODate;
 }

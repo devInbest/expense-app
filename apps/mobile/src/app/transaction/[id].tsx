@@ -12,9 +12,10 @@ import {
   type TransactionType,
   LIMITS,
 } from '@expense/shared';
-import { AmountInput, CategoryPicker, DateField } from '@/components/finance';
+import { AccountPicker, AmountInput, CategoryPicker, DateField } from '@/components/finance';
 import { Appear, Button, Chip, ErrorText, Field, Glass, Loading, Row, Screen, Section, Segmented } from '@/components/ui';
 import { useCategories, useLocalQuery } from '@/hooks/data';
+import { accountsForMethod, defaultAccountId, useAccounts } from '@/lib/accounts';
 import { trackFeature } from '@/lib/analytics';
 import { errorMessage, isOffline } from '@/lib/api';
 import { useUser } from '@/lib/auth';
@@ -47,8 +48,12 @@ function TransactionFormBody({ existing }: { existing?: LocalTransaction }) {
   const [maxDate] = useState(() => new Date(Date.now() + 86_400_000));
   const [amount, setAmount] = useState(existing ? String(fromMinor(existing.amount, existing.currency)) : '');
   const [categoryId, setCategoryId] = useState<string | undefined>(existing?.categoryId);
+  const [recipient, setRecipient] = useState(existing?.recipient ?? '');
   const [note, setNote] = useState(existing?.note ?? '');
   const [method, setMethod] = useState<PaymentMethod>(existing?.paymentMethod ?? defaultPaymentMethod(user));
+  const savedAccounts = useAccounts();
+  const accountOptions = useMemo(() => accountsForMethod(savedAccounts, method), [savedAccounts, method]);
+  const [accountId, setAccountId] = useState(() => existing?.accountId ?? defaultAccountId(accountOptions));
   const [date, setDate] = useState(() => (existing ? new Date(existing.occurredAt) : new Date()));
   const [receiptUrl, setReceiptUrl] = useState<string | null>(existing?.receiptUrl ?? null);
   const [uploading, setUploading] = useState(false);
@@ -71,8 +76,10 @@ function TransactionFormBody({ existing }: { existing?: LocalTransaction }) {
         amount: minor,
         currency,
         categoryId,
+        recipient: recipient.trim(),
         note: note.trim(),
         paymentMethod: method,
+        accountId: accountOptions.some((a) => a.id === accountId) ? accountId : '',
         occurredAt: date.toISOString(),
         receiptUrl,
         tags: existing?.tags ?? [],
@@ -142,6 +149,13 @@ function TransactionFormBody({ existing }: { existing?: LocalTransaction }) {
       </Appear>
 
       <Appear index={2} style={{ gap: spacing.lg }}>
+        <Field
+          label="Paid To"
+          value={recipient}
+          onChangeText={setRecipient}
+          placeholder="Recipient name"
+          maxLength={LIMITS.MAX_RECIPIENT_LENGTH}
+        />
         <Field label="Note" value={note} onChangeText={setNote} placeholder="What was it for?" maxLength={280} />
 
         <Section title={type === 'income' ? 'Received via' : 'Paid with'}>
@@ -152,12 +166,18 @@ function TransactionFormBody({ existing }: { existing?: LocalTransaction }) {
                 label={METHOD_LABEL[m]}
                 icon={METHOD_ICON[m]}
                 selected={method === m}
-                onPress={() => setMethod(m)}
+                onPress={() => {
+                  if (m === method) return;
+                  setMethod(m);
+                  setAccountId(defaultAccountId(accountsForMethod(savedAccounts, m)));
+                }}
                 style={{ flex: 1, justifyContent: 'center', paddingHorizontal: spacing.sm }}
               />
             ))}
           </Row>
         </Section>
+
+        <AccountPicker accounts={accountOptions} value={accountId} onChange={setAccountId} />
 
         <DateField label="Date" value={date} onChange={setDate} maximumDate={maxDate} />
 

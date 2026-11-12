@@ -54,6 +54,15 @@ export const paymentMethodsForUser = (
 export const defaultPaymentMethod = (user: { phone?: string | null; defaultCurrency?: string | null }): PaymentMethod =>
   isIndianUser(user) ? PAYMENT_METHODS.UPI : PAYMENT_METHODS.CASH;
 
+/** Saved accounts a payment can be tagged with. Only bank and card payments have several to choose from. */
+export const PAYMENT_ACCOUNT_KINDS = { BANK: 'bank', CARD: 'card' } as const;
+export type PaymentAccountKind = (typeof PAYMENT_ACCOUNT_KINDS)[keyof typeof PAYMENT_ACCOUNT_KINDS];
+export const PAYMENT_ACCOUNT_KIND_VALUES = values(PAYMENT_ACCOUNT_KINDS);
+
+/** The saved-account kind a payment method draws from, if any. */
+export const accountKindForMethod = (method: PaymentMethod): PaymentAccountKind | null =>
+  method === PAYMENT_METHODS.BANK ? PAYMENT_ACCOUNT_KINDS.BANK : method === PAYMENT_METHODS.CARD ? PAYMENT_ACCOUNT_KINDS.CARD : null;
+
 export const BANK_TXN_DIRECTIONS = { DEBIT: 'debit', CREDIT: 'credit' } as const;
 export type BankTxnDirection = (typeof BANK_TXN_DIRECTIONS)[keyof typeof BANK_TXN_DIRECTIONS];
 export const BANK_TXN_DIRECTION_VALUES = values(BANK_TXN_DIRECTIONS);

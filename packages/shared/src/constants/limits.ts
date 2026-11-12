@@ -9,6 +9,8 @@ export const LIMITS = {
   MAX_SYNC_BATCH: 200,
   MAX_EVENTS_BATCH: 100,
   MAX_NOTE_LENGTH: 500,
+  MAX_RECIPIENT_LENGTH: 100,
+  MAX_PAYMENT_ACCOUNTS: 20,
   /** 1 crore in major units; stored as minor units. */
   MAX_AMOUNT_MINOR: 10_000_000_00,
   PAGE_SIZE: 30,

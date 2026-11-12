@@ -2,7 +2,7 @@ import { useMutation } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { Platform, Pressable, View } from 'react-native';
 import { popup } from '@/components/popup';
-import { isUpiNumber, type NotificationPrefs } from '@expense/shared';
+import { type NotificationPrefs } from '@expense/shared';
 import { ProfilePhoto } from '@/components/ProfilePhoto';
 import { AppText, Appear, Button, Card, Divider, Glass, Icon, ListItem, Screen, Section, Segmented, ToggleRow } from '@/components/ui';
 import { useSyncStatus } from '@/hooks/data';
@@ -133,7 +133,9 @@ export default function Profile() {
 
       <Section title="Money">
         <Card>
-          <ListItem icon="qrcode" title="UPI ID" subtitle={!user.upiId ? 'Add so room members can pay you' : isUpiNumber(user.upiId) ? 'Change to a UPI ID so members can pay you directly' : user.upiId} onPress={() => router.push('/upi')} />
+          <ListItem icon="wallet-outline" title="Accounts" onPress={() => router.push('/accounts')} />
+          <Divider />
+          <ListItem icon="swap-horizontal" title="Self Transfer" onPress={() => router.push('/transfers')} />
           <Divider />
           <ListItem icon="calendar-sync" title="Recurring" onPress={() => router.push('/recurring')} />
           <Divider />

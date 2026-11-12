@@ -42,7 +42,7 @@ export const listTransactions = async (userId: unknown, q: ListQuery) => {
   if (q.paymentMethod) filter.paymentMethod = q.paymentMethod;
   if (q.q) {
     const rx = new RegExp(escapeRegex(q.q), 'i');
-    filter.$and = [...((filter.$and as unknown[]) ?? []), { $or: [{ note: rx }, { tags: rx }] }];
+    filter.$and = [...((filter.$and as unknown[]) ?? []), { $or: [{ note: rx }, { recipient: rx }, { tags: rx }] }];
   }
   const docs = await Transaction.find(filter).sort({ occurredAt: -1, _id: -1 }).limit(q.limit + 1).lean();
   const page = pageOf(docs, q.limit, 'occurredAt');

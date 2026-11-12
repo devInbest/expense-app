@@ -1,5 +1,5 @@
 import mongoose, { type HydratedDocument, type InferSchemaType } from 'mongoose';
-import { DEFAULT_CURRENCY, USER_STATUS_VALUES, type UserDTO } from '@expense/shared';
+import { DEFAULT_CURRENCY, PAYMENT_ACCOUNT_KIND_VALUES, USER_STATUS_VALUES, type PaymentAccountKind, type UserDTO } from '@expense/shared';
 
 const userSchema = new mongoose.Schema(
   {
@@ -11,6 +11,19 @@ const userSchema = new mongoose.Schema(
     googleId: { type: String },
     avatarUrl: { type: String },
     upiId: { type: String, trim: true },
+    /** Bank accounts and cards: nickname + last 4 digits only. */
+    accounts: {
+      type: [
+        {
+          _id: false,
+          id: { type: String, required: true },
+          kind: { type: String, enum: PAYMENT_ACCOUNT_KIND_VALUES, required: true },
+          name: { type: String, required: true, trim: true },
+          last4: { type: String, default: '' },
+        },
+      ],
+      default: [],
+    },
     defaultCurrency: { type: String, default: DEFAULT_CURRENCY },
     timezone: { type: String, default: 'Asia/Kolkata' },
     locale: { type: String, default: 'en-IN' },
@@ -65,5 +78,6 @@ export const toUserDTO = (u: UserDoc | (UserAttrs & { _id: unknown })): UserDTO 
     productUpdates: u.notificationPrefs?.productUpdates ?? true,
   },
   upiId: u.upiId ?? undefined,
+  accounts: (u.accounts ?? []).map((a) => ({ id: a.id, kind: a.kind as PaymentAccountKind, name: a.name, last4: a.last4 ?? '' })),
   createdAt: new Date(u.createdAt as Date).toISOString(),
 });

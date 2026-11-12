@@ -5,8 +5,8 @@ import { Pressable, RefreshControl, SectionList, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { qk } from '@expense/api-client';
-import type { RoomSpendingItemDTO, TransactionType } from '@expense/shared';
-import { Money, RoomExpenseRow, TransactionRow } from '@/components/finance';
+import type { RoomSpendingItemDTO, TransactionType, TransferDTO } from '@expense/shared';
+import { Money, RoomExpenseRow, TransactionRow, TransferRow } from '@/components/finance';
 import { SyncBanner } from '@/components/SyncBanner';
 import { TabHeader } from '@/components/TabHeader';
 import {
@@ -27,6 +27,7 @@ import {
   useTabBarInset,
 } from '@/components/ui';
 import { useCategories, useLocalQuery, useSpendingSummary } from '@/hooks/data';
+import { useAccounts } from '@/lib/accounts';
 import { api } from '@/lib/api';
 import { useUser } from '@/lib/auth';
 import { formatDay, formatMonth, iso, monthRange } from '@/lib/dates';
@@ -180,7 +181,10 @@ function StatTile({ label, icon, tone, children }: { label: string; icon: string
   );
 }
 
-type FeedItem = { kind: 'tx'; key: string; at: string; tx: LocalTransaction } | { kind: 'room'; key: string; at: string; room: RoomSpendingItemDTO };
+type FeedItem =
+  | { kind: 'tx'; key: string; at: string; tx: LocalTransaction }
+  | { kind: 'room'; key: string; at: string; room: RoomSpendingItemDTO }
+  | { kind: 'transfer'; key: string; at: string; transfer: TransferDTO };
 
 export default function Transactions() {
   const user = useUser();
@@ -188,6 +192,7 @@ export default function Transactions() {
   const tabInset = useTabBarInset();
   const reveal = useRevealList();
   const { byId } = useCategories();
+  const accounts = useAccounts();
   const [type, setType] = useState<TransactionType | undefined>();
   const [limit, setLimit] = useState(PAGE);
   const [refreshing, setRefreshing] = useState(false);
@@ -205,12 +210,20 @@ export default function Transactions() {
     queryFn: () => api.rooms.spendingItems({ from: range.from, to: range.to }),
     staleTime: 60_000,
   });
+  // Self transfers aren't spending or income, so they only appear under "All".
+  const transfers = useQuery({
+    queryKey: qk.transfers(range.from, range.to),
+    queryFn: () => api.transfers.list({ from: range.from, to: range.to }),
+    enabled: !type,
+    staleTime: 60_000,
+  });
   const { data: summary, reload: reloadSummary } = useSpendingSummary(range.from, range.to);
   const sections = useMemo(() => {
     const rooms = type === 'income' ? [] : (roomItems.data ?? []);
     const feed: FeedItem[] = [
       ...(items ?? []).map((tx) => ({ kind: 'tx' as const, key: tx.clientId, at: tx.occurredAt, tx })),
       ...rooms.map((room) => ({ kind: 'room' as const, key: `room-${room.expenseId}`, at: room.occurredAt, room })),
+      ...(type ? [] : (transfers.data ?? [])).map((transfer) => ({ kind: 'transfer' as const, key: `transfer-${transfer._id}`, at: transfer.occurredAt, transfer })),
     ].sort((a, b) => b.at.localeCompare(a.at));
 
     const groups = new Map<string, FeedItem[]>();
@@ -221,10 +234,10 @@ export default function Transactions() {
     return [...groups.entries()].map(([key, data]) => ({
       key,
       title: formatDay(key),
-      total: data.reduce((s, i) => s + (i.kind === 'room' ? i.room.share : i.tx.type === 'expense' ? i.tx.amount : 0), 0),
+      total: data.reduce((s, i) => s + (i.kind === 'room' ? i.room.share : i.kind === 'tx' && i.tx.type === 'expense' ? i.tx.amount : 0), 0),
       data,
     }));
-  }, [items, roomItems.data, type]);
+  }, [items, roomItems.data, transfers.data, type]);
 
   const toggleDay = (key: string) =>
     setCollapsed((prev) => {
@@ -237,7 +250,7 @@ export default function Transactions() {
   const onRefresh = async () => {
     setRefreshing(true);
     reloadSummary();
-    await Promise.all([syncNow(), roomItems.refetch()]);
+    await Promise.all([syncNow(), roomItems.refetch(), type ? null : transfers.refetch()]);
     setRefreshing(false);
   };
 
@@ -322,7 +335,13 @@ export default function Transactions() {
                       borderBottomLeftRadius: last ? radius.lg : 0,
                       borderBottomRightRadius: last ? radius.lg : 0,
                     }}>
-                    {item.kind === 'room' ? (
+                    {item.kind === 'transfer' ? (
+                      <TransferRow
+                        transfer={item.transfer}
+                        accounts={accounts}
+                        onPress={() => router.push({ pathname: '/transfer/[id]', params: { id: item.transfer._id } })}
+                      />
+                    ) : item.kind === 'room' ? (
                       <RoomExpenseRow
                         item={item.room}
                         currency={user.defaultCurrency}

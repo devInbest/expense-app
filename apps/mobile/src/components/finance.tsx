@@ -2,12 +2,13 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { useMemo, useState, type ReactNode } from 'react';
 import { FlatList, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useSafeAreaFrame } from 'react-native-safe-area-context';
-import { formatMoney, getCurrency, type CategoryDTO, type RoomSpendingItemDTO, type TransactionType } from '@expense/shared';
+import { formatMoney, getCurrency, type CategoryDTO, type PaymentAccount, type RoomSpendingItemDTO, type TransactionType, type TransferDTO } from '@expense/shared';
 import { UNKNOWN_CATEGORY } from '@/hooks/data';
+import { ACCOUNT_KIND_ICON, accountLabel, endpointLabel } from '@/lib/accounts';
 import { formatDate, formatTime } from '@/lib/dates';
 import type { LocalTransaction } from '@/lib/transactions';
 import { radius, spacing, useTheme } from '@/theme';
-import { AppText, Button, CategoryIcon, Field, Icon, Row, Section, Sheet, SheetFrame, SheetHeader, useFieldBoxStyle } from './ui';
+import { AppText, Button, CategoryIcon, Chip, Field, Icon, Row, Section, Sheet, SheetFrame, SheetHeader, useFieldBoxStyle } from './ui';
 
 export function Money({
   amount,
@@ -157,11 +158,13 @@ export function CategoryPicker({
   value,
   onChange,
   title = 'Category',
+  hint,
 }: {
   categories: CategoryDTO[];
   value?: string;
   onChange: (id: string) => void;
   title?: string;
+  hint?: ReactNode;
 }) {
   const { colors } = useTheme();
   const [open, setOpen] = useState(false);
@@ -190,6 +193,7 @@ export function CategoryPicker({
           </Pressable>
         ) : null
       }>
+      {hint}
       <ScrollView
         horizontal
         nestedScrollEnabled
@@ -426,6 +430,56 @@ export function RoomExpenseRow({
         </AppText>
       </View>
       <Money amount={item.share} currency={currency} type="expense" variant="body" />
+    </Pressable>
+  );
+}
+
+/** Saved bank accounts / cards for the chosen payment method. Optional: tapping the selected one clears it. */
+export function AccountPicker({
+  accounts,
+  value,
+  onChange,
+}: {
+  accounts: PaymentAccount[];
+  value: string;
+  onChange: (id: string) => void;
+}) {
+  if (!accounts.length) return null;
+  const kind = accounts[0]!.kind;
+  return (
+    <Section title={kind === 'card' ? 'Which card?' : 'Which bank account?'}>
+      <Row style={{ flexWrap: 'wrap' }}>
+        {accounts.map((a) => (
+          <Chip
+            key={a.id}
+            label={accountLabel(a)}
+            icon={ACCOUNT_KIND_ICON[a.kind]}
+            selected={value === a.id}
+            onPress={() => onChange(value === a.id ? '' : a.id)}
+          />
+        ))}
+      </Row>
+    </Section>
+  );
+}
+
+/** A self transfer in the activity feed: "From → To", neutral amount (it isn't spending). */
+export function TransferRow({ transfer, accounts, onPress }: { transfer: TransferDTO; accounts: PaymentAccount[]; onPress?: () => void }) {
+  const { colors } = useTheme();
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm + 2, opacity: pressed ? 0.6 : 1 })}>
+      <CategoryIcon icon="swap-horizontal" color={colors.primary} size={44} square />
+      <View style={{ flex: 1 }}>
+        <AppText numberOfLines={1} style={{ fontWeight: '600' }}>
+          {endpointLabel(transfer.fromAccount, accounts)} → {endpointLabel(transfer.toAccount, accounts)}
+        </AppText>
+        <AppText variant="caption" muted numberOfLines={1}>
+          {transfer.note ? `${formatTime(transfer.occurredAt)} · ${transfer.note}` : formatTime(transfer.occurredAt)}
+        </AppText>
+      </View>
+      <Money amount={transfer.amount} currency={transfer.currency} variant="body" />
     </Pressable>
   );
 }

@@ -176,6 +176,43 @@ describe('personal tracking', () => {
     expect(budgets.body.data[0].percent).toBe(85);
   });
 
+  it('records self transfers between saved accounts and cash, kept out of spending', async () => {
+    const user = await signUp(app, 'Mover');
+    const accounts = [
+      { id: 'bank-account-1', kind: 'bank', name: 'SBI Savings', last4: '1234' },
+      { id: 'credit-card-1', kind: 'card', name: 'HDFC Regalia', last4: '5678' },
+    ];
+    await request(app).patch(api('/me')).set(user.auth).send({ accounts }).expect(200);
+    await request(app)
+      .patch(api('/me'))
+      .set(user.auth)
+      .send({ accounts: [{ ...accounts[0], last4: '' }] })
+      .expect(400);
+
+    const now = new Date().toISOString();
+    await request(app).post(api('/transfers')).set(user.auth).send({ amount: 500, fromAccount: 'cash', toAccount: 'cash', occurredAt: now }).expect(400);
+    await request(app).post(api('/transfers')).set(user.auth).send({ amount: 500, fromAccount: 'cash', toAccount: 'nope', occurredAt: now }).expect(400);
+    const made = await request(app)
+      .post(api('/transfers'))
+      .set(user.auth)
+      .send({ amount: 200000, fromAccount: 'bank-account-1', toAccount: 'credit-card-1', occurredAt: now, note: 'Card bill' })
+      .expect(201);
+    expect(made.body.data).toMatchObject({ amount: 200000, fromAccount: 'bank-account-1', toAccount: 'credit-card-1', note: 'Card bill' });
+
+    const id = made.body.data._id;
+    await request(app).patch(api(`/transfers/${id}`)).set(user.auth).send({ toAccount: 'cash' }).expect(200);
+    const list = await request(app).get(api('/transfers')).set(user.auth).expect(200);
+    expect(list.body.data).toHaveLength(1);
+    expect(list.body.data[0].toAccount).toBe('cash');
+
+    const other = await signUp(app, 'Stranger');
+    await request(app).get(api(`/transfers/${id}`)).set(other.auth).expect(404);
+
+    await request(app).delete(api(`/transfers/${id}`)).set(user.auth).expect(200);
+    const after = await request(app).get(api('/transfers')).set(user.auth).expect(200);
+    expect(after.body.data).toHaveLength(0);
+  });
+
   it('exports PDF statements, and guards uploads', async () => {
     const user = await signUp(app, 'Exporter');
     const cats = await request(app).get(api('/categories')).set(user.auth);

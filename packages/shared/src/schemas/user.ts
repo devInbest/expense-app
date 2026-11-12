@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { PLATFORM_VALUES } from '../constants/enums';
+import { PAYMENT_ACCOUNT_KIND_VALUES, PLATFORM_VALUES } from '../constants/enums';
+import { LIMITS } from '../constants/limits';
 import { currencySchema, phoneSchema, upiIdSchema } from './common';
 
 export const usernameSchema = z
@@ -16,6 +17,18 @@ export const notificationPrefsSchema = z.object({
 });
 export type NotificationPrefs = Required<z.infer<typeof notificationPrefsSchema>>;
 
+/** A bank account or card the user pays from. Only a nickname and the last 4 digits (required) are kept, never full numbers. */
+export const paymentAccountSchema = z.object({
+  id: z.string().trim().min(8).max(64),
+  kind: z.enum(PAYMENT_ACCOUNT_KIND_VALUES),
+  name: z.string().trim().min(1, 'Name is required').max(40),
+  last4: z
+    .string()
+    .trim()
+    .regex(/^\d{4}$/, 'Enter the last 4 digits'),
+});
+export type PaymentAccount = z.infer<typeof paymentAccountSchema>;
+
 export const updateProfileSchema = z.object({
   name: z.string().trim().min(1, 'Name is required').max(80).optional(),
   username: usernameSchema.optional(),
@@ -27,6 +40,12 @@ export const updateProfileSchema = z.object({
   notificationPrefs: notificationPrefsSchema.optional(),
   /** Shown to room members so they can pay this user back. Empty clears it. */
   upiId: upiIdSchema.optional().or(z.literal('')),
+  /** Replaces the full list of saved bank accounts and cards. */
+  accounts: z
+    .array(paymentAccountSchema)
+    .max(LIMITS.MAX_PAYMENT_ACCOUNTS)
+    .refine((list) => new Set(list.map((a) => a.id)).size === list.length, 'Duplicate account')
+    .optional(),
 });
 export type UpdateProfileInput = z.input<typeof updateProfileSchema>;
 
