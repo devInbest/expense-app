@@ -12,6 +12,7 @@ const budgetSchema = new mongoose.Schema(
     endDate: { type: Date },
     alertThresholds: { type: [Number], default: [80, 100] },
     rollover: { type: Boolean, default: false },
+    note: { type: String, default: '' },
     /** "<periodStartISO>:<threshold>" markers so each alert fires once per period. */
     notifiedThresholds: { type: [String], default: [] },
     deletedAt: { type: Date, default: null },
@@ -35,4 +36,5 @@ export const toBudgetDTO = (b: BudgetAttrs & { _id: unknown }): BudgetDTO => ({
   endDate: b.endDate ? b.endDate.toISOString() : undefined,
   alertThresholds: b.alertThresholds,
   rollover: b.rollover,
+  note: b.note ?? '',
 });

@@ -4,7 +4,7 @@ import { Switch, View } from 'react-native';
 import { popup } from '@/components/popup';
 import { qk } from '@expense/api-client';
 import { RECURRING_FREQUENCY_VALUES, formatMoney, toMinor, type RecurringFrequency, type RecurringRuleDTO } from '@expense/shared';
-import { AmountInput, CategoryGrid, DateField } from '@/components/finance';
+import { AmountInput, CategoryPicker, DateField } from '@/components/finance';
 import {
   AppText,
   BottomBar,
@@ -108,6 +108,12 @@ function NewRuleSheet({ onClose }: { onClose: () => void }) {
   const [type, setType] = useState<'expense' | 'income'>('expense');
   const [amount, setAmount] = useState('');
   const [categoryId, setCategoryId] = useState<string>();
+  // A category belongs to one type, so switching type clears the pick.
+  const pickType = (t: 'expense' | 'income') => {
+    if (t === type) return;
+    setType(t);
+    setCategoryId(undefined);
+  };
   const [note, setNote] = useState('');
   const [frequency, setFrequency] = useState<RecurringFrequency>('monthly');
   const [startDate, setStartDate] = useState(new Date());
@@ -135,8 +141,8 @@ function NewRuleSheet({ onClose }: { onClose: () => void }) {
   return (
     <Sheet visible title="New recurring" onClose={onClose}>
       <Row>
-        <Chip label="Expense" selected={type === 'expense'} onPress={() => setType('expense')} />
-        <Chip label="Income" selected={type === 'income'} onPress={() => setType('income')} />
+        <Chip label="Expense" selected={type === 'expense'} onPress={() => pickType('expense')} />
+        <Chip label="Income" selected={type === 'income'} onPress={() => pickType('income')} />
       </Row>
       <AmountInput value={amount} onChange={setAmount} currency={user.defaultCurrency} />
       <Field label="Note" value={note} onChangeText={setNote} placeholder="e.g. Netflix" />
@@ -148,9 +154,7 @@ function NewRuleSheet({ onClose }: { onClose: () => void }) {
         </Row>
       </Section>
       <DateField label="Starts" value={startDate} onChange={setStartDate} />
-      <Section title="Category">
-        <CategoryGrid categories={categories.filter((c) => c.type === type)} value={categoryId} onChange={setCategoryId} />
-      </Section>
+      <CategoryPicker key={type} categories={categories.filter((c) => c.type === type)} value={categoryId} onChange={setCategoryId} />
       <ErrorText>{error}</ErrorText>
       <Button title="Create" onPress={() => create.mutate()} loading={create.isPending} />
     </Sheet>

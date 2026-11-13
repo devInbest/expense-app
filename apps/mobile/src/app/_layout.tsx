@@ -93,6 +93,8 @@ function AppNavigator({ signedIn, onboarded }: { signedIn: boolean; onboarded: b
             contentStyle: { backgroundColor: colors.background },
           }}>
           <Stack.Screen name="index" options={{ headerShown: false }} />
+          {/* Readable signed in or out: linked from the sign-in screen and from Profile. */}
+          <Stack.Screen name="legal/[doc]" options={{ title: '' }} />
 
           <Stack.Protected guard={!signedIn}>
             <Stack.Screen name="(auth)" options={{ headerShown: false }} />
@@ -107,12 +109,15 @@ function AppNavigator({ signedIn, onboarded }: { signedIn: boolean; onboarded: b
             <Stack.Screen name="profile" options={{ title: 'Profile' }} />
             <Stack.Screen name="upi" options={{ title: 'UPI ID' }} />
             <Stack.Screen name="accounts" options={{ title: 'Accounts' }} />
+            <Stack.Screen name="account/[id]" options={{ title: 'Account' }} />
             <Stack.Screen name="transfers" options={{ title: 'Self Transfer' }} />
             <Stack.Screen name="transaction/[id]" options={{ presentation: 'modal', title: 'Transaction' }} />
             <Stack.Screen name="transfer/[id]" options={{ presentation: 'modal', title: 'Self transfer' }} />
+            <Stack.Screen name="transfer/view/[id]" options={{ title: 'Self Transfer' }} />
             <Stack.Screen name="transaction/view/[id]" options={{ title: 'Transaction' }} />
             <Stack.Screen name="bin" options={{ title: 'Bin' }} />
             <Stack.Screen name="budgets" options={{ title: 'Budgets' }} />
+            <Stack.Screen name="budget/view/[id]" options={{ title: 'Budget' }} />
             <Stack.Screen name="categories" options={{ title: 'Categories' }} />
             <Stack.Screen name="recurring" options={{ title: 'Recurring' }} />
             <Stack.Screen name="notifications" options={{ title: 'Notifications' }} />

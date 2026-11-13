@@ -72,7 +72,12 @@ export type BankTxnStatus = (typeof BANK_TXN_STATUS)[keyof typeof BANK_TXN_STATU
 export const BANK_TXN_STATUS_VALUES = values(BANK_TXN_STATUS);
 
 /** What a bank transaction was turned into: a personal entry, a room expense, or paying back a room share. */
-export const BANK_TXN_LINK_KINDS = { TRANSACTION: 'transaction', ROOM_EXPENSE: 'room_expense', ROOM_PAYMENT: 'room_payment' } as const;
+export const BANK_TXN_LINK_KINDS = {
+  TRANSACTION: 'transaction',
+  ROOM_EXPENSE: 'room_expense',
+  ROOM_PAYMENT: 'room_payment',
+  TRANSFER: 'transfer',
+} as const;
 export type BankTxnLinkKind = (typeof BANK_TXN_LINK_KINDS)[keyof typeof BANK_TXN_LINK_KINDS];
 export const BANK_TXN_LINK_KIND_VALUES = values(BANK_TXN_LINK_KINDS);
 

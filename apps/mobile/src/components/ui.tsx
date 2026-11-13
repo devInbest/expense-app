@@ -23,7 +23,12 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { GestureDetector, GestureHandlerRootView, useNativeGesture, usePanGesture, type PanGestureActiveEvent } from 'react-native-gesture-handler';
-import { KeyboardAvoidingView, KeyboardAwareScrollView, KeyboardStickyView } from 'react-native-keyboard-controller';
+import {
+  KeyboardAvoidingView,
+  KeyboardAwareScrollView,
+  KeyboardStickyView,
+  useReanimatedKeyboardAnimation,
+} from 'react-native-keyboard-controller';
 import Animated, {
   Easing,
   FadeIn,
@@ -1295,11 +1300,14 @@ export function FrostedSurface({
   style,
   rounded = radius.xl,
   edge = 'all',
+  fill = false,
 }: {
   children?: ReactNode;
   style?: StyleProp<ViewStyle>;
   rounded?: number;
   edge?: 'all' | 'top';
+  /** Let the content grow with the surface; the first child stays at the top, the last at the bottom. */
+  fill?: boolean;
 }) {
   const { colors, dark } = useTheme();
   const blur = Platform.OS === 'ios';
@@ -1335,7 +1343,7 @@ export function FrostedSurface({
           { experimental_backgroundImage: `linear-gradient(180deg, ${colors.glassHighlight} 0%, rgba(255,255,255,0) 46%)` },
         ]}
       />
-      <View style={{ zIndex: 1 }}>{children}</View>
+      <View style={fill ? { zIndex: 1, flexGrow: 1, justifyContent: 'space-between' } : { zIndex: 1 }}>{children}</View>
     </View>
   );
 }
@@ -1371,7 +1379,7 @@ const EXPAND_TIMING = { duration: 240, easing: Easing.out(Easing.cubic) };
  * Pull the sheet down to close. Upward movement stays with the list, unless the sheet is
  * expandable: then pulling up grows it to full screen, and pulling down shrinks it back first.
  */
-function DismissibleSheet({ header, children }: { header: ReactNode; children: ReactNode }) {
+function DismissibleSheet({ header, children, tall = false }: { header: ReactNode; children: ReactNode; tall?: boolean }) {
   const drag = useContext(SheetDragContext);
   const dragY = drag?.dragY;
   const atTop = drag?.atTop;
@@ -1440,14 +1448,26 @@ function DismissibleSheet({ header, children }: { header: ReactNode; children: R
     ),
   );
   const { height } = useSafeAreaFrame();
+  const insets = useSafeAreaInsets();
+  const [headerHeight, setHeaderHeight] = useState(64);
+  // Tall sheets: while the keyboard is open the sheet reaches the top of the app (see SheetFrame), so the
+  // form gets whatever room is left above the keyboard. Driven by the keyboard animation itself.
+  const keyboard = useReanimatedKeyboardAnimation();
+  const maxScroll = tall
+    ? Math.max(120, height - insets.top - headerHeight - Math.max(insets.bottom, spacing.sm) - 2)
+    : Math.max(240, height * 0.78);
   const scrollY = useSharedValue(0);
   const onScroll = useAnimatedScrollHandler((event) => {
     scrollY.set(event.contentOffset.y);
     if (atTop) atTop.set(event.contentOffset.y <= 1);
   });
+  const scrollRoom = useAnimatedStyle(() => ({ maxHeight: Math.max(120, maxScroll - Math.abs(keyboard.height.get())) }));
   const scroller = (
     <KeyboardAwareScrollView
-      style={{ maxHeight: Math.max(240, height * 0.78) }}
+      style={tall ? undefined : { maxHeight: maxScroll }}
+      // The frame's KeyboardAvoidingView already lifts the sheet above the keyboard. Letting this
+      // scroller also pad itself by the keyboard height made the sheet stretch to the top on focus.
+      enabled={false}
       bottomOffset={spacing.md}
       contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.xl, gap: spacing.lg }}
       keyboardShouldPersistTaps="handled"
@@ -1459,23 +1479,25 @@ function DismissibleSheet({ header, children }: { header: ReactNode; children: R
   );
   if (!drag) {
     return (
-      <>
-        {header}
-        <RevealScope scrollY={scrollY}>{scroller}</RevealScope>
-      </>
+      <View>
+        <View onLayout={(e) => setHeaderHeight(e.nativeEvent.layout.height)}>{header}</View>
+        {/* Sheets reveal on open, not on scroll: items measured while the sheet is still sliding up would stay hidden. */}
+        <RevealScope scrollY={null}>{tall ? <Animated.View style={scrollRoom}>{scroller}</Animated.View> : scroller}</RevealScope>
+      </View>
     );
   }
   return (
     <GestureDetector gesture={pan}>
       <View>
-        {header}
-        <RevealScope scrollY={scrollY}>
-          <GestureDetector gesture={native}>{scroller}</GestureDetector>
+        <View onLayout={(e) => setHeaderHeight(e.nativeEvent.layout.height)}>{header}</View>
+        <RevealScope scrollY={null}>
+          <GestureDetector gesture={native}>{tall ? <Animated.View style={scrollRoom}>{scroller}</Animated.View> : scroller}</GestureDetector>
         </RevealScope>
       </View>
     </GestureDetector>
   );
 }
+
 
 /** Animated bottom sheet shell. Content hugs its height up to most of the screen. */
 export function SheetFrame({
@@ -1485,6 +1507,7 @@ export function SheetFrame({
   dismissOnScrim = false,
   dragToDismiss = false,
   expandable = false,
+  tall = false,
   children,
 }: {
   visible: boolean;
@@ -1495,6 +1518,8 @@ export function SheetFrame({
   dragToDismiss?: boolean;
   /** With `dragToDismiss`: pull up to grow to full screen, pull down to shrink back, then again to close. */
   expandable?: boolean;
+  /** Content may grow until the sheet's top meets the app's header bar (instead of most of the screen). */
+  tall?: boolean;
   children: ReactNode;
 }) {
   const insets = useSafeAreaInsets();
@@ -1538,12 +1563,27 @@ export function SheetFrame({
     }
   }, [visible, dragY, atTop, expandProgress]);
 
+  // Tall sheets stay attached to the bottom of the screen and, while the keyboard is open, stretch all the
+  // way up to the top of the app (just under the status bar). Instead of the whole sheet being lifted, a
+  // spacer at its bottom grows with the keyboard, so the content sits right above it.
+  const keyboard = useReanimatedKeyboardAnimation();
+  const keyboardSpacer = useAnimatedStyle(() => ({ height: Math.abs(keyboard.height.get()) }));
+  const appHeight = screenHeight - insets.top;
+  // Grows with the keyboard animation, from the content's own height up to the whole app.
+  const reachTop = useAnimatedStyle(() => ({ minHeight: keyboard.progress.get() * appHeight }));
+
   const frame = (
     <View style={{ flex: 1 }}>
       <OverlayScrim style={scrimStyle} onPress={dismissOnScrim ? onClose : undefined} />
-      <KeyboardAvoidingView behavior="padding" pointerEvents="box-none" style={{ flex: 1, justifyContent: 'flex-end' }}>
-        <Animated.View style={[{ width: '100%', maxHeight: '94%' }, sheetStyle]}>
-          <FrostedSurface edge="top" style={{ paddingBottom: bottomPad }}>
+      <KeyboardAvoidingView behavior="padding" enabled={!tall} pointerEvents="box-none" style={{ flex: 1, justifyContent: 'flex-end' }}>
+        <Animated.View
+          style={[
+            { width: '100%' },
+            { maxHeight: tall ? appHeight : '94%' },
+            tall ? reachTop : null,
+            sheetStyle,
+          ]}>
+          <FrostedSurface edge="top" fill={tall} style={[{ paddingBottom: bottomPad }, tall ? { flexGrow: 1 } : null]}>
             <SheetDragContext.Provider value={dragToDismiss ? dragControls : null}>
               {canExpand ? (
                 <Animated.View
@@ -1558,6 +1598,7 @@ export function SheetFrame({
                 children
               )}
             </SheetDragContext.Provider>
+            {tall ? <Animated.View style={keyboardSpacer} /> : null}
           </FrostedSurface>
         </Animated.View>
       </KeyboardAvoidingView>
@@ -1579,6 +1620,7 @@ export function Sheet({
   showClose = true,
   dragToDismiss = false,
   expandable = false,
+  tall = false,
   children,
 }: {
   visible: boolean;
@@ -1591,19 +1633,23 @@ export function Sheet({
   dragToDismiss?: boolean;
   /** With `dragToDismiss`: pull up to go full screen. */
   expandable?: boolean;
+  /** With `dragToDismiss`: hug the content, but allow it to grow up to the app's header bar. */
+  tall?: boolean;
   children: ReactNode;
 }) {
   const { height } = useSafeAreaFrame();
-  const { scrollY, onScroll } = useRevealScroll();
+  const { onScroll } = useRevealScroll();
   const header = <SheetHeader title={title} icon={icon} onClose={onClose} showClose={showClose} />;
   return (
-    <SheetFrame visible={visible} onClose={onClose} dismissOnScrim dragToDismiss={dragToDismiss} expandable={expandable}>
+    <SheetFrame visible={visible} onClose={onClose} dismissOnScrim dragToDismiss={dragToDismiss} expandable={expandable} tall={tall && dragToDismiss}>
       {dragToDismiss ? (
-        <DismissibleSheet header={header}>{children}</DismissibleSheet>
+        <DismissibleSheet header={header} tall={tall}>
+          {children}
+        </DismissibleSheet>
       ) : (
         <>
           {header}
-          <RevealScope scrollY={scrollY}>
+          <RevealScope scrollY={null}>
             <KeyboardAwareScrollView
               style={{ maxHeight: Math.max(240, height * 0.78) }}
               bottomOffset={spacing.md}

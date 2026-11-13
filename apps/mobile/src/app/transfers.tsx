@@ -1,15 +1,116 @@
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { RefreshControl, View } from 'react-native';
+import { Pressable, RefreshControl, View } from 'react-native';
 import { qk } from '@expense/api-client';
+import { LIMITS } from '@expense/shared';
 import { Money, TransferRow } from '@/components/finance';
-import { AppText, Appear, Card, Divider, EmptyState, ErrorState, Fab, Glass, IconButton, Loading, Row, Screen } from '@/components/ui';
+import { AppText, Appear, Card, Divider, EmptyState, ErrorState, Fab, Icon, linearGradient, Loading, Row, Screen } from '@/components/ui';
 import { useAccounts } from '@/lib/accounts';
 import { api, errorMessage } from '@/lib/api';
 import { useUser } from '@/lib/auth';
 import { formatDay, formatMonth, iso, monthRange } from '@/lib/dates';
 import { radius, spacing, useTheme } from '@/theme';
+
+/** Round frosted arrow on the gradient card. */
+function NavButton({ icon, label, onPress, disabled }: { icon: string; label: string; onPress: () => void; disabled?: boolean }) {
+  const { colors } = useTheme();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled }}
+      disabled={disabled}
+      onPress={onPress}
+      hitSlop={6}
+      style={({ pressed }) => ({
+        width: 34,
+        height: 34,
+        borderRadius: 17,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.35)',
+        opacity: disabled ? 0.35 : pressed ? 0.7 : 1,
+      })}>
+      <Icon name={icon} size={20} color={colors.onPrimary} />
+    </Pressable>
+  );
+}
+
+/** Month summary in the app's gradient style, matching the Activity month card. */
+function MonthCard({
+  month,
+  count,
+  total,
+  currency,
+  canGoNext,
+  canGoPrev,
+  onPrev,
+  onNext,
+}: {
+  month: Date;
+  count: number;
+  total: number;
+  currency: string;
+  canGoNext: boolean;
+  canGoPrev: boolean;
+  onPrev: () => void;
+  onNext: () => void;
+}) {
+  const { colors } = useTheme();
+  return (
+    <View
+      style={{
+        borderRadius: radius.xl,
+        padding: spacing.md + 2,
+        gap: spacing.lg,
+        overflow: 'hidden',
+        backgroundColor: colors.primary,
+        experimental_backgroundImage: linearGradient('#FF7A45', colors.primaryDeep),
+        boxShadow: `0 12px 30px ${colors.primaryGlow}`,
+      }}>
+      <View style={{ position: 'absolute', width: 180, height: 180, borderRadius: 90, backgroundColor: 'rgba(255,255,255,0.14)', top: -90, right: -50 }} />
+      <View style={{ position: 'absolute', width: 120, height: 120, borderRadius: 60, backgroundColor: 'rgba(255,255,255,0.08)', bottom: -60, left: -30 }} />
+
+      <Row gap={spacing.md}>
+        <View
+          style={{
+            width: 48,
+            height: 48,
+            borderRadius: radius.md,
+            backgroundColor: 'rgba(255,255,255,0.2)',
+            borderWidth: 1,
+            borderColor: 'rgba(255,255,255,0.35)',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+          <Icon name="swap-horizontal" size={24} color={colors.onPrimary} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <AppText variant="heading" color={colors.onPrimary} numberOfLines={1}>
+            {formatMonth(month)}
+          </AppText>
+          <AppText variant="caption" color={colors.onPrimary} style={{ opacity: 0.85 }}>
+            {count} {count === 1 ? 'Transfer' : 'Transfers'}
+          </AppText>
+        </View>
+        <Row gap={spacing.xs}>
+          <NavButton icon="chevron-left" label="Previous month" onPress={onPrev} disabled={!canGoPrev} />
+          <NavButton icon="chevron-right" label="Next month" onPress={onNext} disabled={!canGoNext} />
+        </Row>
+      </Row>
+
+      <View style={{ gap: 2 }}>
+        <AppText variant="caption" color={colors.onPrimary} style={{ opacity: 0.85, fontWeight: '600' }}>
+          Total movement
+        </AppText>
+        <Money amount={total} currency={currency} variant="title" color={colors.onPrimary} />
+      </View>
+    </View>
+  );
+}
 
 /** Self transfers between cash, bank accounts and cards, month by month. */
 export default function Transfers() {
@@ -50,23 +151,16 @@ export default function Transfers() {
         contentStyle={{ flexGrow: 1, paddingBottom: 120 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />}>
         <Appear>
-          <Glass blur rounded={radius.xl} style={{ padding: spacing.md, gap: spacing.sm }}>
-            <Row>
-              <IconButton icon="chevron-left" label="Previous month" onPress={() => setOffset((o) => o - 1)} />
-              <AppText variant="subheading" style={{ flex: 1, textAlign: 'center' }}>
-                {formatMonth(month.from)}
-              </AppText>
-              <View pointerEvents={offset >= 0 ? 'none' : 'auto'} style={{ opacity: offset >= 0 ? 0.3 : 1 }}>
-                <IconButton icon="chevron-right" label="Next month" onPress={() => setOffset((o) => Math.min(0, o + 1))} />
-              </View>
-            </Row>
-            <Row style={{ justifyContent: 'space-between' }}>
-              <AppText muted>
-                {list?.length ?? 0} {list?.length === 1 ? 'transfer' : 'transfers'}
-              </AppText>
-              <Money amount={total} currency={user.defaultCurrency} variant="subheading" />
-            </Row>
-          </Glass>
+          <MonthCard
+            month={month.from}
+            count={list?.length ?? 0}
+            total={total}
+            currency={user.defaultCurrency}
+            canGoNext={offset < 0}
+            canGoPrev={offset > -LIMITS.TRANSFER_MAX_MONTHS_BACK}
+            onPrev={() => setOffset((o) => Math.max(-LIMITS.TRANSFER_MAX_MONTHS_BACK, o - 1))}
+            onNext={() => setOffset((o) => Math.min(0, o + 1))}
+          />
         </Appear>
 
         {transfers.isPending ? (
@@ -91,7 +185,7 @@ export default function Transfers() {
                 {day.items.map((t, j) => (
                   <View key={t._id}>
                     {j ? <Divider /> : null}
-                    <TransferRow transfer={t} accounts={accounts} onPress={() => router.push({ pathname: '/transfer/[id]', params: { id: t._id } })} />
+                    <TransferRow transfer={t} accounts={accounts} onPress={() => router.push({ pathname: '/transfer/view/[id]', params: { id: t._id } })} />
                   </View>
                 ))}
               </Card>
@@ -99,7 +193,7 @@ export default function Transfers() {
           ))
         )}
       </Screen>
-      <Fab label="Add self transfer" icon="swap-horizontal" safeBottom onPress={() => router.push({ pathname: '/transfer/[id]', params: { id: 'new' } })} />
+      <Fab label="Add self transfer" icon="swap-horizontal" safeBottom onPress={() => router.push({ pathname: '/transaction/[id]', params: { id: 'new', type: 'transfer' } })} />
     </View>
   );
 }

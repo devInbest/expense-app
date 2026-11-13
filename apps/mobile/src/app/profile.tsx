@@ -9,6 +9,7 @@ import { useSyncStatus } from '@/hooks/data';
 import { api, showError } from '@/lib/api';
 import { useAuth, useUser } from '@/lib/auth';
 import { config } from '@/lib/config';
+import { canRateApp, canSendFeedback, openStoreReview, sendFeedback } from '@/lib/store';
 import { timeAgo } from '@/lib/dates';
 import { syncNow } from '@/lib/sync';
 import { setThemeMode, useThemeMode } from '@/lib/themeMode';
@@ -135,7 +136,7 @@ export default function Profile() {
         <Card>
           <ListItem icon="wallet-outline" title="Accounts" onPress={() => router.push('/accounts')} />
           <Divider />
-          <ListItem icon="swap-horizontal" title="Self Transfer" onPress={() => router.push('/transfers')} />
+          <ListItem icon="chart-donut" title="Budgets" onPress={() => router.push('/budgets')} />
           <Divider />
           <ListItem icon="calendar-sync" title="Recurring" onPress={() => router.push('/recurring')} />
           <Divider />
@@ -183,6 +184,34 @@ export default function Profile() {
             onPress={() => void syncNow()}
             right={<View />}
           />
+        </Card>
+      </Section>
+
+      <Section title="About">
+        <Card>
+          <ListItem icon="shield-lock-outline" title="Privacy Policy" onPress={() => router.push({ pathname: '/legal/[doc]', params: { doc: 'privacy' } })} />
+          <Divider />
+          <ListItem icon="file-document-outline" title="Terms & Conditions" onPress={() => router.push({ pathname: '/legal/[doc]', params: { doc: 'terms' } })} />
+          {canRateApp ? (
+            <>
+              <Divider />
+              <ListItem
+                icon="star-outline"
+                title="Rate & review"
+                onPress={() => openStoreReview().catch(() => popup.error('Couldn’t open the Play Store', 'Please try again later.'))}
+              />
+            </>
+          ) : null}
+          {canSendFeedback ? (
+            <>
+              <Divider />
+              <ListItem
+                icon="message-text-outline"
+                title="Send feedback"
+                onPress={() => sendFeedback(config.appVersion).catch(() => popup.error('Couldn’t open your email app'))}
+              />
+            </>
+          ) : null}
         </Card>
       </Section>
 

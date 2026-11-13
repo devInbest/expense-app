@@ -1,25 +1,16 @@
 import { Router } from 'express';
 import mongoose from 'mongoose';
-import { CASH_ACCOUNT_ID, createTransferSchema, listTransfersQuerySchema, updateTransferSchema } from '@expense/shared';
+import { createTransferSchema, listTransfersQuerySchema, updateTransferSchema } from '@expense/shared';
 import { asyncHandler } from '../../core/asyncHandler';
 import { created, ok } from '../../core/ApiResponse';
 import { ApiError } from '../../core/ApiError';
 import { query, validate } from '../../core/validate';
 import type { UserDoc } from '../users/user.model';
 import { toTransferDTO, Transfer } from './transfer.model';
+import { assertEndpoints, assertRecentEnough, createTransfer } from './transfer.service';
 
 const router = Router();
 const LIST_LIMIT = 500;
-
-/**
- * Ends being set must be cash or one of the user's saved accounts, and the two ends must differ.
- * An end that isn't changing may point at an account removed since, so editing the note still works.
- */
-const assertEndpoints = (user: UserDoc, from: string, to: string, changed: string[] = [from, to]) => {
-  const ids = new Set([CASH_ACCOUNT_ID, ...(user.accounts ?? []).map((a) => a.id)]);
-  if (changed.some((id) => !ids.has(id))) throw ApiError.badRequest('That account no longer exists');
-  if (from === to) throw ApiError.badRequest('Pick two different accounts');
-};
 
 const findOwn = async (user: UserDoc, id: string) => {
   if (!mongoose.isValidObjectId(id)) throw ApiError.notFound('Transfer not found');
@@ -60,10 +51,7 @@ router.post(
   '/',
   validate(createTransferSchema),
   asyncHandler(async (req, res) => {
-    const user = req.user!;
-    assertEndpoints(user, req.body.fromAccount, req.body.toAccount);
-    const transfer = await Transfer.create({ ...req.body, currency: req.body.currency ?? user.defaultCurrency, userId: user._id });
-    created(res, toTransferDTO(transfer.toObject()), 'Transfer saved');
+    created(res, await createTransfer(req.user!, req.body), 'Transfer saved');
   }),
 );
 
@@ -73,6 +61,9 @@ router.patch(
   asyncHandler(async (req, res) => {
     const user = req.user!;
     const transfer = await findOwn(user, String(req.params.id));
+    if (req.body.occurredAt && new Date(req.body.occurredAt).getTime() !== transfer.occurredAt.getTime()) {
+      assertRecentEnough(new Date(req.body.occurredAt));
+    }
     const changed = [req.body.fromAccount, req.body.toAccount].filter((id): id is string => Boolean(id));
     transfer.set(req.body);
     assertEndpoints(user, transfer.fromAccount, transfer.toAccount, changed);

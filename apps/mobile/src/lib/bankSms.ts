@@ -81,6 +81,21 @@ export const scanBankSms = () => {
   return inflight;
 };
 
+/**
+ * Re-reads the last FIRST_SCAN_DAYS of SMS from scratch, for alerts an earlier scan missed. Safe to
+ * repeat: the server skips payments it already has, so ignored or saved ones are left as they are.
+ */
+export const resyncBankSms = async () => {
+  if (!isSmsImportEnabled()) return 0;
+  // Let any scan in progress finish so it can't move the cursor forward again after the reset.
+  await inflight?.catch(() => 0);
+  await kv.remove(CURSOR_KEY);
+  return scanBankSms();
+};
+
+/** How far back a resync reads, for messages shown to the user. */
+export const RESYNC_DAYS = FIRST_SCAN_DAYS;
+
 /** Calls `fn` when a new SMS lands while the app is running. Returns an unsubscribe function. */
 export const onNewSms = (fn: () => void) => {
   const sub = SmsInbox?.addListener('onSmsReceived', fn);

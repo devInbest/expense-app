@@ -12,7 +12,7 @@ import { TabHeader } from '@/components/TabHeader';
 import { AppText, Backdrop, Banner, Button, Card, CategoryIcon, EmptyState, ErrorState, Loading, Row, Segmented, useTabBarInset } from '@/components/ui';
 import { trackFeature } from '@/lib/analytics';
 import { api, errorMessage, showError } from '@/lib/api';
-import { isSmsImportEnabled, requestSmsPermission, scanBankSms, SMS_ACCESS_KEY, smsImportSupported } from '@/lib/bankSms';
+import { isSmsImportEnabled, requestSmsPermission, RESYNC_DAYS, resyncBankSms, scanBankSms, SMS_ACCESS_KEY, smsImportSupported } from '@/lib/bankSms';
 import { radius, spacing, useTheme } from '@/theme';
 
 const TABS: { value: BankTxnStatus; label: string }[] = [
@@ -41,6 +41,7 @@ export default function BankInbox() {
   const queryClient = useQueryClient();
   const [status, setStatus] = useState<BankTxnStatus>('pending');
   const [refreshing, setRefreshing] = useState(false);
+  const [resyncing, setResyncing] = useState(false);
 
   const list = useInfiniteQuery({ ...listQuery(status), getNextPageParam: (last) => last.nextCursor ?? undefined });
 
@@ -74,6 +75,22 @@ export default function BankInbox() {
     }
   };
 
+  /** Re-reads the last 60 days of SMS, not just what arrived since the last scan. */
+  const resync = async () => {
+    setResyncing(true);
+    try {
+      const added = await resyncBankSms();
+      await queryClient.invalidateQueries({ queryKey: qk.bankAll });
+      trackFeature('bank_sms_resync');
+      if (added > 0) popup.success(`Found ${added} new bank transaction${added > 1 ? 's' : ''}`);
+      else popup.alert('You’re up to date', `No new bank transactions in the last ${RESYNC_DAYS} days of SMS.`);
+    } catch (err) {
+      showError(err, "Couldn't read bank SMS");
+    } finally {
+      setResyncing(false);
+    }
+  };
+
   const enable = async () => {
     const result = await requestSmsPermission();
     if (result === 'blocked') {
@@ -103,11 +120,21 @@ export default function BankInbox() {
       {setup === 'unsupported' && Platform.OS !== 'android' ? (
         <Banner icon="information-outline" text="Bank SMS can only be read on Android. Transactions imported on your Android phone show up here too." />
       ) : null}
+      {setup === 'unsupported' && Platform.OS === 'android' ? (
+        // Android but no SMS module: Expo Go, or an old build made before SMS import existed.
+        <Banner
+          icon="information-outline"
+          text="Reading bank SMS (and Resync messages) needs the installed app. It isn't available in Expo Go. Transactions imported there still show up here."
+        />
+      ) : null}
       <Segmented
         options={TABS}
         value={status}
         onChange={setStatus}
       />
+      {setup === 'on' ? (
+        <Button title="Resync messages" icon="message-sync" variant="glass" color={colors.primary} compact loading={resyncing} onPress={() => void resync()} />
+      ) : null}
     </View>
   );
 

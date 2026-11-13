@@ -4,6 +4,7 @@ import { LIMITS } from '../constants/limits';
 import { amountSchema, currencySchema, cursorQuerySchema, dateSchema, objectIdSchema } from './common';
 import { createTransactionSchema } from './finance';
 import { createRoomExpenseSchema } from './room';
+import { transferBodySchema } from './transfer';
 
 /** One transaction parsed on the device from a bank SMS. The SMS text itself never leaves the phone. */
 export const bankTransactionInputSchema = z.object({
@@ -51,6 +52,11 @@ export const linkBankTransactionSchema = z.discriminatedUnion('kind', [
     roomId: objectIdSchema,
     expenseId: objectIdSchema,
     userId: objectIdSchema,
+  }),
+  /** Moving my own money: from/to are cash or saved accounts (e.g. paying a card bill from savings). */
+  z.object({
+    kind: z.literal('transfer'),
+    transfer: transferBodySchema,
   }),
 ]);
 export type LinkBankTransactionInput = z.input<typeof linkBankTransactionSchema>;

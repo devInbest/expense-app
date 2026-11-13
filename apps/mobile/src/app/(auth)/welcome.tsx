@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { router } from 'expo-router';
 import { Image } from 'expo-image';
 import { StatusBar } from 'expo-status-bar';
 import { Pressable, StyleSheet, View } from 'react-native';
@@ -55,9 +56,11 @@ export default function Welcome() {
 
       <Animated.View entering={FadeInUp.delay(300).duration(500).easing(MOTION.easing)} style={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.lg }}>
         <Glass blur style={{ padding: spacing.lg, gap: spacing.md }} rounded={30}>
-          {/* Phone login temporarily disabled — Google only for now.
-          <Button title="Continue with phone" icon="cellphone" disabled={!accepted} onPress={() => router.push('/phone')} />
-          */}
+          {/* Release builds are Google-only for now. Development keeps phone login, since Google
+              sign-in needs a native module that Expo Go doesn't have. */}
+          {__DEV__ ? (
+            <Button title="Continue with phone" icon="cellphone" variant="glass" disabled={!accepted} onPress={() => router.push('/phone')} />
+          ) : null}
           {isGoogleConfigured() ? (
             <Button
               title="Continue with Google"
@@ -75,7 +78,22 @@ export default function Welcome() {
             style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm }}>
             <Icon name={accepted ? 'checkbox-marked' : 'checkbox-blank-outline'} size={20} color={accepted ? colors.primary : colors.textMuted} />
             <AppText variant="caption" muted>
-              I agree to the Terms and Privacy Policy
+              I agree to the{' '}
+              <AppText
+                variant="caption"
+                color={colors.primary}
+                style={{ fontWeight: '700' }}
+                onPress={() => router.push({ pathname: '/legal/[doc]', params: { doc: 'terms' } })}>
+                Terms
+              </AppText>{' '}
+              and{' '}
+              <AppText
+                variant="caption"
+                color={colors.primary}
+                style={{ fontWeight: '700' }}
+                onPress={() => router.push({ pathname: '/legal/[doc]', params: { doc: 'privacy' } })}>
+                Privacy Policy
+              </AppText>
             </AppText>
           </Pressable>
         </Glass>

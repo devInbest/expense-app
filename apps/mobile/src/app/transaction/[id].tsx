@@ -3,16 +3,9 @@ import { Redirect, router, Stack, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { popup } from '@/components/popup';
-import {
-  defaultPaymentMethod,
-  fromMinor,
-  paymentMethodsForUser,
-  toMinor,
-  type PaymentMethod,
-  type TransactionType,
-  LIMITS,
-} from '@expense/shared';
+import { defaultPaymentMethod, fromMinor, paymentMethodsForUser, toMinor, type PaymentMethod, type TransactionType, LIMITS } from '@expense/shared';
 import { AccountPicker, AmountInput, CategoryPicker, DateField } from '@/components/finance';
+import { TransferFields } from '@/components/TransferFields';
 import { Appear, Button, Chip, ErrorText, Field, Glass, Loading, Row, Screen, Section, Segmented } from '@/components/ui';
 import { useCategories, useLocalQuery } from '@/hooks/data';
 import { accountsForMethod, defaultAccountId, useAccounts } from '@/lib/accounts';
@@ -23,13 +16,27 @@ import { createTransaction, getTransaction, updateTransaction, type LocalTransac
 import { pickAndUploadImage } from '@/lib/uploads';
 import { radius, spacing } from '@/theme';
 
-const METHOD_LABEL: Record<PaymentMethod, string> = { cash: 'Cash', upi: 'UPI', card: 'Card', bank: 'Bank', other: 'Other' };
-const METHOD_ICON: Record<PaymentMethod, string> = { cash: 'cash', upi: 'qrcode-scan', card: 'credit-card-outline', bank: 'bank-outline', other: 'wallet-outline' };
+const METHOD_LABEL: Record<PaymentMethod, string> = {
+  cash: 'Cash',
+  upi: 'UPI',
+  card: 'Card',
+  bank: 'Bank',
+  other: 'Other',
+};
+const METHOD_ICON: Record<PaymentMethod, string> = {
+  cash: 'cash',
+  upi: 'qrcode-scan',
+  card: 'credit-card-outline',
+  bank: 'bank-outline',
+  other: 'wallet-outline',
+};
 
-/** `new` adds a transaction; any other id edits that saved transaction. */
+type Kind = TransactionType | 'transfer';
+
+/** `new` adds a transaction (`?type=transfer` opens the Transfer tab); any other id edits that saved transaction. */
 export default function TransactionForm() {
-  const { id } = useLocalSearchParams<{ id: string }>();
-  if (id === 'new') return <TransactionFormBody />;
+  const { id, type } = useLocalSearchParams<{ id: string; type?: string }>();
+  if (id === 'new') return <TransactionFormBody initialKind={type === 'transfer' || type === 'income' ? type : 'expense'} />;
   return <EditTransactionForm id={id} />;
 }
 
@@ -40,11 +47,13 @@ function EditTransactionForm({ id }: { id: string }) {
   return <TransactionFormBody existing={tx} />;
 }
 
-function TransactionFormBody({ existing }: { existing?: LocalTransaction }) {
+function TransactionFormBody({ existing, initialKind = 'expense' }: { existing?: LocalTransaction; initialKind?: Kind }) {
   const user = useUser();
   const { categories } = useCategories();
 
-  const [type, setType] = useState<TransactionType>(existing?.type ?? 'expense');
+  // Self transfers can only be added here; a saved transaction can't be turned into one.
+  const [kind, setKind] = useState<Kind>(existing?.type ?? initialKind);
+  const type: TransactionType = kind === 'income' ? 'income' : 'expense';
   const [maxDate] = useState(() => new Date(Date.now() + 86_400_000));
   const [amount, setAmount] = useState(existing ? String(fromMinor(existing.amount, existing.currency)) : '');
   const [categoryId, setCategoryId] = useState<string | undefined>(existing?.categoryId);
@@ -118,8 +127,16 @@ function TransactionFormBody({ existing }: { existing?: LocalTransaction }) {
     popup.menu({
       title: 'Add receipt',
       actions: [
-        { label: 'Take photo', icon: 'camera-outline', onPress: () => void attach('camera') },
-        { label: 'Choose from library', icon: 'image-outline', onPress: () => void attach('library') },
+        {
+          label: 'Take photo',
+          icon: 'camera-outline',
+          onPress: () => void attach('camera'),
+        },
+        {
+          label: 'Choose from library',
+          icon: 'image-outline',
+          onPress: () => void attach('library'),
+        },
       ],
     });
 
@@ -128,74 +145,89 @@ function TransactionFormBody({ existing }: { existing?: LocalTransaction }) {
       <Stack.Screen options={{ title: existing ? 'Edit transaction' : 'Add transaction' }} />
       <Appear>
         <Glass blur style={{ padding: spacing.md, gap: spacing.xs }} rounded={radius.xl}>
-          <Segmented
+          <Segmented<Kind>
             glass
             options={[
               { value: 'expense', label: 'Expense' },
               { value: 'income', label: 'Income' },
+              ...(existing ? [] : [{ value: 'transfer' as const, label: 'Transfer' }]),
             ]}
-            value={type}
-            onChange={(t) => {
-              setType(t);
+            value={kind}
+            onChange={(k) => {
+              if (k === kind) return;
+              setKind(k);
               setCategoryId(undefined);
+              setError(null);
             }}
           />
           <AmountInput value={amount} onChange={setAmount} currency={currency} autoFocus={!existing} />
         </Glass>
       </Appear>
 
-      <Appear index={1}>
-        <CategoryPicker categories={visibleCategories} value={categoryId} onChange={setCategoryId} />
-      </Appear>
+      {kind === 'transfer' ? (
+        <TransferFields amount={amount} currency={currency} />
+      ) : (
+        <>
+          <Appear index={1}>
+            <CategoryPicker key={type} categories={visibleCategories} value={categoryId} onChange={setCategoryId} />
+          </Appear>
 
-      <Appear index={2} style={{ gap: spacing.lg }}>
-        <Field
-          label="Paid To"
-          value={recipient}
-          onChangeText={setRecipient}
-          placeholder="Recipient name"
-          maxLength={LIMITS.MAX_RECIPIENT_LENGTH}
-        />
-        <Field label="Note" value={note} onChangeText={setNote} placeholder="What was it for?" maxLength={280} />
+          <Appear index={2} style={{ gap: spacing.lg }}>
+            <Field label="Paid To" value={recipient} onChangeText={setRecipient} placeholder="Recipient name" maxLength={LIMITS.MAX_RECIPIENT_LENGTH} />
+            <Field label="Note" value={note} onChangeText={setNote} placeholder="What was it for?" maxLength={280} />
 
-        <Section title={type === 'income' ? 'Received via' : 'Paid with'}>
-          <Row>
-            {paymentMethods.map((m) => (
-              <Chip
-                key={m}
-                label={METHOD_LABEL[m]}
-                icon={METHOD_ICON[m]}
-                selected={method === m}
-                onPress={() => {
-                  if (m === method) return;
-                  setMethod(m);
-                  setAccountId(defaultAccountId(accountsForMethod(savedAccounts, m)));
-                }}
-                style={{ flex: 1, justifyContent: 'center', paddingHorizontal: spacing.sm }}
-              />
-            ))}
-          </Row>
-        </Section>
+            <Section title={type === 'income' ? 'Received via' : 'Paid with'}>
+              <Row>
+                {paymentMethods.map((m) => (
+                  <Chip
+                    key={m}
+                    label={METHOD_LABEL[m]}
+                    icon={METHOD_ICON[m]}
+                    selected={method === m}
+                    onPress={() => {
+                      if (m === method) return;
+                      setMethod(m);
+                      setAccountId(defaultAccountId(accountsForMethod(savedAccounts, m)));
+                    }}
+                    style={{
+                      flex: 1,
+                      justifyContent: 'center',
+                      paddingHorizontal: spacing.sm,
+                    }}
+                  />
+                ))}
+              </Row>
+            </Section>
 
-        <AccountPicker accounts={accountOptions} value={accountId} onChange={setAccountId} />
+            <AccountPicker accounts={accountOptions} value={accountId} onChange={setAccountId} />
 
-        <DateField label="Date" value={date} onChange={setDate} maximumDate={maxDate} />
+            <DateField label="Date" value={date} onChange={setDate} maximumDate={maxDate} />
 
-        <View style={{ gap: spacing.sm }}>
-          <Section title="Receipt">
-            {receiptUrl ? (
-              <View style={{ gap: spacing.sm }}>
-                <Image source={{ uri: receiptUrl }} style={{ width: '100%', height: 200, borderRadius: radius.lg }} contentFit="cover" />
-                <Button title="Remove receipt" variant="ghost" compact onPress={() => setReceiptUrl(null)} />
-              </View>
-            ) : (
-              <Button title="Attach receipt" icon="camera-outline" variant="glass" loading={uploading} onPress={chooseReceiptSource} />
-            )}
-          </Section>
-          <ErrorText>{error}</ErrorText>
-          <Button title={existing ? 'Save changes' : 'Save'} icon="check" onPress={save} loading={saving} />
-        </View>
-      </Appear>
+            <View style={{ gap: spacing.sm }}>
+              <Section title="Receipt">
+                {receiptUrl ? (
+                  <View style={{ gap: spacing.sm }}>
+                    <Image
+                      source={{ uri: receiptUrl }}
+                      style={{
+                        width: '100%',
+                        height: 200,
+                        borderRadius: radius.lg,
+                      }}
+                      contentFit="cover"
+                    />
+                    <Button title="Remove receipt" variant="ghost" compact onPress={() => setReceiptUrl(null)} />
+                  </View>
+                ) : (
+                  <Button title="Attach receipt" icon="camera-outline" variant="glass" loading={uploading} onPress={chooseReceiptSource} />
+                )}
+              </Section>
+              <ErrorText>{error}</ErrorText>
+              <Button title={existing ? 'Save changes' : 'Save'} icon="check" onPress={save} loading={saving} />
+            </View>
+          </Appear>
+        </>
+      )}
     </Screen>
   );
 }

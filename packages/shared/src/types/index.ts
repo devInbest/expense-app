@@ -235,6 +235,7 @@ export interface LinkBankTransactionResult {
   bankTransaction: BankTransactionDTO;
   transaction?: TransactionDTO;
   roomExpense?: RoomExpenseDTO;
+  transfer?: TransferDTO;
 }
 
 export interface BudgetDTO {
@@ -248,6 +249,8 @@ export interface BudgetDTO {
   endDate?: ISODate;
   alertThresholds: number[];
   rollover: boolean;
+  /** What the budget is for, e.g. "Goa trip" or "Cut down on food delivery". */
+  note: string;
 }
 
 export interface BudgetProgressDTO extends BudgetDTO {

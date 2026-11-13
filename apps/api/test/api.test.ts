@@ -192,6 +192,21 @@ describe('personal tracking', () => {
     const now = new Date().toISOString();
     await request(app).post(api('/transfers')).set(user.auth).send({ amount: 500, fromAccount: 'cash', toAccount: 'cash', occurredAt: now }).expect(400);
     await request(app).post(api('/transfers')).set(user.auth).send({ amount: 500, fromAccount: 'cash', toAccount: 'nope', occurredAt: now }).expect(400);
+    const sevenMonthsAgo = new Date();
+    sevenMonthsAgo.setMonth(sevenMonthsAgo.getMonth() - 7);
+    await request(app)
+      .post(api('/transfers'))
+      .set(user.auth)
+      .send({ amount: 500, fromAccount: 'cash', toAccount: 'bank-account-1', occurredAt: sevenMonthsAgo.toISOString() })
+      .expect(400);
+    const fiveMonthsAgo = new Date();
+    fiveMonthsAgo.setMonth(fiveMonthsAgo.getMonth() - 5);
+    const older = await request(app)
+      .post(api('/transfers'))
+      .set(user.auth)
+      .send({ amount: 500, fromAccount: 'cash', toAccount: 'bank-account-1', occurredAt: fiveMonthsAgo.toISOString() })
+      .expect(201);
+    await request(app).delete(api(`/transfers/${older.body.data._id}`)).set(user.auth).expect(200);
     const made = await request(app)
       .post(api('/transfers'))
       .set(user.auth)
@@ -497,6 +512,38 @@ describe('bank transactions', () => {
     accountMask: '1234',
     reference: fingerprint.split(':').pop(),
     paymentMethod: 'upi',
+  });
+
+  it('saves a bank transaction as a self transfer', async () => {
+    const user = await signUp(app, 'Card Payer');
+    await request(app)
+      .patch(api('/me'))
+      .set(user.auth)
+      .send({
+        accounts: [
+          { id: 'savings-0001', kind: 'bank', name: 'HDFC Savings', last4: '1234' },
+          { id: 'card-00001', kind: 'card', name: 'HDFC Regalia', last4: '9876' },
+        ],
+      })
+      .expect(200);
+    await request(app).post(api('/bank-transactions/ingest')).set(user.auth).send({ items: [item('debit:500000:T1', 'debit', 500000, 'CARD BILL')] }).expect(200);
+    const [txn] = (await request(app).get(api('/bank-transactions')).set(user.auth).expect(200)).body.data.items;
+
+    const transfer = (to: string) => ({
+      kind: 'transfer',
+      transfer: { amount: txn.amount, fromAccount: 'savings-0001', toAccount: to, occurredAt: txn.occurredAt, note: 'Card bill' },
+    });
+    await request(app).post(api(`/bank-transactions/${txn._id}/link`)).set(user.auth).send(transfer('savings-0001')).expect(400);
+    const linked = await request(app).post(api(`/bank-transactions/${txn._id}/link`)).set(user.auth).send(transfer('card-00001')).expect(200);
+    expect(linked.body.data.bankTransaction.status).toBe('linked');
+    expect(linked.body.data.bankTransaction.link).toMatchObject({ kind: 'transfer', id: linked.body.data.transfer._id });
+    expect(linked.body.data.transfer).toMatchObject({ amount: 500000, fromAccount: 'savings-0001', toAccount: 'card-00001' });
+
+    const transfers = await request(app).get(api('/transfers')).set(user.auth).expect(200);
+    expect(transfers.body.data).toHaveLength(1);
+    // Not counted as spending.
+    const tx = await request(app).get(api('/transactions')).set(user.auth).expect(200);
+    expect(tx.body.data.items ?? tx.body.data).toHaveLength(0);
   });
 
   it('ingests without duplicates, saves as personal, remembers the category, and ignores', async () => {

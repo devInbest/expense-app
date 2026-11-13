@@ -10,7 +10,10 @@ export const LIMITS = {
   MAX_EVENTS_BATCH: 100,
   MAX_NOTE_LENGTH: 500,
   MAX_RECIPIENT_LENGTH: 100,
+  MAX_BUDGET_NOTE_LENGTH: 200,
   MAX_PAYMENT_ACCOUNTS: 20,
+  /** Self transfers can be dated at most this many months back. */
+  TRANSFER_MAX_MONTHS_BACK: 6,
   /** 1 crore in major units; stored as minor units. */
   MAX_AMOUNT_MINOR: 10_000_000_00,
   PAGE_SIZE: 30,

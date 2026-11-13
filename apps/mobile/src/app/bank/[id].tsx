@@ -18,7 +18,7 @@ import {
   type TransactionType,
 } from '@expense/shared';
 import { bankTxnSource, bankTxnTitle, LINK_LABEL } from '@/components/BankTxnRow';
-import { AccountPicker, AmountInput, CategoryPicker } from '@/components/finance';
+import { AccountPicker, AmountInput, CategoryPicker, EndpointPicker } from '@/components/finance';
 import {
   AppText,
   Appear,
@@ -41,7 +41,7 @@ import {
 } from '@/components/ui';
 import { UNKNOWN_CATEGORY, useCategories } from '@/hooks/data';
 import { useRoom } from '@/hooks/rooms';
-import { accountsForMethod, defaultAccountId, useAccounts } from '@/lib/accounts';
+import { accountsForMethod, defaultAccountId, transferEndpoints, useAccounts } from '@/lib/accounts';
 import { trackFeature } from '@/lib/analytics';
 import { api, errorMessage } from '@/lib/api';
 import { useUser } from '@/lib/auth';
@@ -53,7 +53,7 @@ const METHOD_LABEL = { cash: 'Cash', upi: 'UPI', card: 'Card', bank: 'Bank trans
 
 const TITLE: Record<BankTxnStatus, string> = { pending: 'Transaction', linked: 'Marked', ignored: 'Ignored' };
 
-type Mode = 'personal' | 'room';
+type Mode = 'personal' | 'room' | 'transfer';
 type RoomMode = 'room_expense' | 'room_payment';
 
 export default function BankReview() {
@@ -153,12 +153,13 @@ function PendingActions({ item }: { item: BankTransactionDTO }) {
           options={[
             { value: 'personal', label: 'Personal' },
             { value: 'room', label: 'Room' },
+            { value: 'transfer', label: 'Self Transfer' },
           ]}
           value={mode}
           onChange={setMode}
         />
       </Section>
-      {mode === 'personal' ? <PersonalForm item={item} /> : <RoomActions item={item} />}
+      {mode === 'personal' ? <PersonalForm item={item} /> : mode === 'room' ? <RoomActions item={item} /> : <TransferForm item={item} />}
       <Button
         title="Ignore"
         icon="eye-off-outline"
@@ -248,6 +249,75 @@ function PersonalForm({ item }: { item: BankTransactionDTO }) {
       <AccountPicker accounts={accountOptions} value={accountId} onChange={setAccountId} />
       <ErrorText>{error}</ErrorText>
       <Button title={type === 'income' ? 'Save as Income' : 'Save as Expense'} icon="check" loading={save.isPending} onPress={() => save.mutate()} />
+    </>
+  );
+}
+
+/**
+ * Saves the bank transaction as a self transfer. The account in the SMS (matched by its last digits)
+ * is preselected as the "From" side of a debit, or the "To" side of a credit.
+ */
+function TransferForm({ item }: { item: BankTransactionDTO }) {
+  const queryClient = useQueryClient();
+  const afterSave = useAfterSave();
+  const accounts = useAccounts();
+  const endpoints = useMemo(() => transferEndpoints(accounts), [accounts]);
+  const debit = item.direction === 'debit';
+  const [smsAccount] = useState(() => defaultAccountId(accounts.filter((a) => a.last4), item.accountMask) || '');
+  const [amount, setAmount] = useState(String(fromMinor(item.amount, item.currency)));
+  const [from, setFrom] = useState(debit ? smsAccount : '');
+  const [to, setTo] = useState(debit ? '' : smsAccount);
+  const [note, setNote] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  const save = useMutation({
+    mutationFn: () => {
+      const minor = toMinor(amount || '0', item.currency);
+      if (minor <= 0) throw new Error('Enter an amount');
+      if (minor > LIMITS.MAX_AMOUNT_MINOR) throw new Error('That amount is too large');
+      if (!from) throw new Error('Pick where the money came from');
+      if (!to) throw new Error('Pick where the money went');
+      if (from === to) throw new Error('Pick two different accounts');
+      return api.bank.link(item._id, {
+        kind: 'transfer',
+        transfer: {
+          amount: minor,
+          currency: item.currency as CreateTransactionInput['currency'],
+          fromAccount: from,
+          toAccount: to,
+          occurredAt: item.occurredAt,
+          note: note.trim(),
+        },
+      });
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: qk.transfersAll });
+      trackFeature('bank_txn_transfer');
+      afterSave();
+    },
+    onError: (err) => setError(errorMessage(err)),
+  });
+
+  const pickFrom = (id: string) => {
+    setFrom(id);
+    if (id === to) setTo('');
+  };
+
+  return (
+    <>
+      <AmountInput value={amount} onChange={setAmount} currency={item.currency} />
+      {!accounts.length ? (
+        <Banner icon="bank-outline" text="Add your bank accounts and cards in Profile → Accounts to move money between them and cash." />
+      ) : null}
+      <Section title="From">
+        <EndpointPicker endpoints={endpoints} value={from} onChange={pickFrom} />
+      </Section>
+      <Section title="To">
+        <EndpointPicker endpoints={endpoints.filter((e) => e.id !== from)} value={to} onChange={setTo} />
+      </Section>
+      <Field label="Note" value={note} onChangeText={setNote} placeholder="What was it for?" maxLength={280} />
+      <ErrorText>{error}</ErrorText>
+      <Button title="Save as Self Transfer" icon="check" loading={save.isPending} onPress={() => save.mutate()} />
     </>
   );
 }
@@ -423,6 +493,7 @@ function LinkedInfo({ item }: { item: BankTransactionDTO }) {
   if (!link) return null;
   const open = () => {
     if (link.kind === 'transaction') router.push({ pathname: '/transaction/view/[id]', params: { id: link.id } });
+    else if (link.kind === 'transfer') router.push({ pathname: '/transfer/view/[id]', params: { id: link.id } });
     else if (link.roomId) router.push({ pathname: '/room/[id]/expense-detail', params: { id: link.roomId, expenseId: link.id } });
   };
   return (

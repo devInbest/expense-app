@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Pressable, RefreshControl, SectionList, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, SectionList, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { qk } from '@expense/api-client';
@@ -58,7 +58,9 @@ function CollapseChevron({ collapsed, color }: { collapsed: boolean; color: stri
   useEffect(() => {
     progress.set(withTiming(collapsed ? 1 : 0, MOTION));
   }, [collapsed, progress]);
-  const style = useAnimatedStyle(() => ({ transform: [{ rotate: `${progress.get() * 180}deg` }] }));
+  const style = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${progress.get() * 180}deg` }],
+  }));
   return (
     <Animated.View style={style}>
       <Icon name="chevron-up" size={20} color={color} />
@@ -106,7 +108,10 @@ function Collapsible({ open, children }: { open: boolean; children: ReactNode })
   useEffect(() => {
     progress.set(withTiming(open ? 1 : 0, MOTION));
   }, [open, progress]);
-  const style = useAnimatedStyle(() => ({ height: height.get() * progress.get(), opacity: progress.get() }));
+  const style = useAnimatedStyle(() => ({
+    height: height.get() * progress.get(),
+    opacity: progress.get(),
+  }));
   return (
     <Animated.View style={[{ overflow: 'hidden' }, style]}>
       {/* Absolutely positioned so the content keeps its natural height while the wrapper shrinks. */}
@@ -132,7 +137,17 @@ function MonthCard({ from, to, count }: { from: Date; to: Date; count: number })
         experimental_backgroundImage: linearGradient('#FF7A45', colors.primaryDeep),
         boxShadow: `0 12px 30px ${colors.primaryGlow}`,
       }}>
-      <View style={{ position: 'absolute', width: 160, height: 160, borderRadius: 80, backgroundColor: 'rgba(255,255,255,0.14)', top: -80, right: -40 }} />
+      <View
+        style={{
+          position: 'absolute',
+          width: 160,
+          height: 160,
+          borderRadius: 80,
+          backgroundColor: 'rgba(255,255,255,0.14)',
+          top: -80,
+          right: -40,
+        }}
+      />
       <Row gap={spacing.md}>
         <View
           style={{
@@ -155,7 +170,13 @@ function MonthCard({ from, to, count }: { from: Date; to: Date; count: number })
             {count} {count === 1 ? 'Transaction' : 'Transactions'}
           </AppText>
         </View>
-        <View style={{ backgroundColor: 'rgba(255,255,255,0.95)', borderRadius: radius.pill, paddingHorizontal: spacing.md, paddingVertical: 5 }}>
+        <View
+          style={{
+            backgroundColor: 'rgba(255,255,255,0.95)',
+            borderRadius: radius.pill,
+            paddingHorizontal: spacing.md,
+            paddingVertical: 5,
+          }}>
           <AppText variant="caption" color={colors.primaryDeep} style={{ fontWeight: '800' }}>
             {left === 0 ? 'Last day' : `${left} ${left === 1 ? 'day' : 'days'} left`}
           </AppText>
@@ -169,7 +190,15 @@ function StatTile({ label, icon, tone, children }: { label: string; icon: string
   return (
     <Glass style={{ flex: 1, padding: spacing.md, gap: spacing.sm }}>
       <Row gap={spacing.sm}>
-        <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: `${tone}1F`, alignItems: 'center', justifyContent: 'center' }}>
+        <View
+          style={{
+            width: 28,
+            height: 28,
+            borderRadius: 14,
+            backgroundColor: `${tone}1F`,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
           <Icon name={icon} size={16} color={tone} />
         </View>
         <AppText variant="caption" muted style={{ fontWeight: '600' }}>
@@ -186,6 +215,20 @@ type FeedItem =
   | { kind: 'room'; key: string; at: string; room: RoomSpendingItemDTO }
   | { kind: 'transfer'; key: string; at: string; transfer: TransferDTO };
 
+type Tab = 'all' | TransactionType | 'transfer';
+const TABS: { value: Tab; label: string }[] = [
+  { value: 'all', label: 'All' },
+  { value: 'expense', label: 'Expenses' },
+  { value: 'income', label: 'Income' },
+  { value: 'transfer', label: 'Transfer' },
+];
+const EMPTY_TEXT: Record<Tab, string> = {
+  all: 'No transactions this month.',
+  expense: 'No expenses this month.',
+  income: 'No income this month.',
+  transfer: 'No transfers this month.',
+};
+
 export default function Transactions() {
   const user = useUser();
   const { colors } = useTheme();
@@ -193,7 +236,10 @@ export default function Transactions() {
   const reveal = useRevealList();
   const { byId } = useCategories();
   const accounts = useAccounts();
-  const [type, setType] = useState<TransactionType | undefined>();
+  const [tab, setTab] = useState<Tab>('all');
+  const type: TransactionType | undefined = tab === 'expense' || tab === 'income' ? tab : undefined;
+  const showTransfers = tab === 'all' || tab === 'transfer';
+  const showLogs = tab !== 'transfer';
   const [limit, setLimit] = useState(PAGE);
   const [refreshing, setRefreshing] = useState(false);
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
@@ -201,29 +247,41 @@ export default function Transactions() {
   const month = monthRange(new Date(), 0);
   const range = iso(month);
 
-  const { data: items } = useLocalQuery(
-    () => listTransactions({ ...range, type, limit }),
-    [range.from, type, limit],
-  );
+  const { data: items } = useLocalQuery(() => listTransactions({ ...range, type, limit }), [range.from, type, limit]);
   const roomItems = useQuery({
     queryKey: qk.roomSpendingItems(range.from, range.to),
     queryFn: () => api.rooms.spendingItems({ from: range.from, to: range.to }),
     staleTime: 60_000,
   });
-  // Self transfers aren't spending or income, so they only appear under "All".
+  // Self transfers aren't spending or income, so they appear under "All" and their own tab only.
   const transfers = useQuery({
     queryKey: qk.transfers(range.from, range.to),
     queryFn: () => api.transfers.list({ from: range.from, to: range.to }),
-    enabled: !type,
+    enabled: showTransfers,
     staleTime: 60_000,
   });
   const { data: summary, reload: reloadSummary } = useSpendingSummary(range.from, range.to);
   const sections = useMemo(() => {
-    const rooms = type === 'income' ? [] : (roomItems.data ?? []);
+    const rooms = !showLogs || type === 'income' ? [] : (roomItems.data ?? []);
     const feed: FeedItem[] = [
-      ...(items ?? []).map((tx) => ({ kind: 'tx' as const, key: tx.clientId, at: tx.occurredAt, tx })),
-      ...rooms.map((room) => ({ kind: 'room' as const, key: `room-${room.expenseId}`, at: room.occurredAt, room })),
-      ...(type ? [] : (transfers.data ?? [])).map((transfer) => ({ kind: 'transfer' as const, key: `transfer-${transfer._id}`, at: transfer.occurredAt, transfer })),
+      ...(showLogs ? (items ?? []) : []).map((tx) => ({
+        kind: 'tx' as const,
+        key: tx.clientId,
+        at: tx.occurredAt,
+        tx,
+      })),
+      ...rooms.map((room) => ({
+        kind: 'room' as const,
+        key: `room-${room.expenseId}`,
+        at: room.occurredAt,
+        room,
+      })),
+      ...(showTransfers ? (transfers.data ?? []) : []).map((transfer) => ({
+        kind: 'transfer' as const,
+        key: `transfer-${transfer._id}`,
+        at: transfer.occurredAt,
+        transfer,
+      })),
     ].sort((a, b) => b.at.localeCompare(a.at));
 
     const groups = new Map<string, FeedItem[]>();
@@ -237,7 +295,7 @@ export default function Transactions() {
       total: data.reduce((s, i) => s + (i.kind === 'room' ? i.room.share : i.kind === 'tx' && i.tx.type === 'expense' ? i.tx.amount : 0), 0),
       data,
     }));
-  }, [items, roomItems.data, transfers.data, type]);
+  }, [items, roomItems.data, transfers.data, type, showLogs, showTransfers]);
 
   const toggleDay = (key: string) =>
     setCollapsed((prev) => {
@@ -250,7 +308,7 @@ export default function Transactions() {
   const onRefresh = async () => {
     setRefreshing(true);
     reloadSummary();
-    await Promise.all([syncNow(), roomItems.refetch(), type ? null : transfers.refetch()]);
+    await Promise.all([syncNow(), roomItems.refetch(), showTransfers ? transfers.refetch() : null]);
     setRefreshing(false);
   };
 
@@ -275,10 +333,11 @@ export default function Transactions() {
           </Appear>
           <Appear index={2}>
             <Row>
-              <Chip label="All" selected={!type} onPress={() => setType(undefined)} />
-              <Chip label="Expenses" selected={type === 'expense'} onPress={() => setType('expense')} />
-              <Chip label="Income" selected={type === 'income'} onPress={() => setType('income')} />
-              <View style={{ flex: 1 }} />
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ gap: spacing.sm }}>
+                {TABS.map((t) => (
+                  <Chip key={t.value} label={t.label} selected={tab === t.value} onPress={() => setTab(t.value)} />
+                ))}
+              </ScrollView>
               <IconButton glass icon="trash-can-outline" label="Bin" color={colors.danger} onPress={() => router.push('/bin')} />
             </Row>
           </Appear>
@@ -288,7 +347,11 @@ export default function Transactions() {
           <SectionList
             sections={sections}
             keyExtractor={(i) => i.key}
-            contentContainerStyle={{ flexGrow: 1, paddingHorizontal: spacing.lg, paddingBottom: tabInset + 80 }}
+            contentContainerStyle={{
+              flexGrow: 1,
+              paddingHorizontal: spacing.lg,
+              paddingBottom: tabInset + 80,
+            }}
             showsVerticalScrollIndicator={false}
             onScroll={reveal.onScroll}
             scrollEventThrottle={reveal.scrollEventThrottle}
@@ -307,9 +370,19 @@ export default function Transactions() {
                     accessibilityState={{ expanded: !isCollapsed }}
                     accessibilityLabel={`${section.title}, ${isCollapsed ? 'expand' : 'collapse'}`}
                     onPress={() => toggleDay(section.key)}
-                    style={({ pressed }) => ({ marginTop: spacing.md, opacity: pressed ? 0.7 : 1 })}>
+                    style={({ pressed }) => ({
+                      marginTop: spacing.md,
+                      opacity: pressed ? 0.7 : 1,
+                    })}>
                     <DayHeaderShape collapsed={isCollapsed}>
-                      <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.primary }} />
+                      <View
+                        style={{
+                          width: 6,
+                          height: 6,
+                          borderRadius: 3,
+                          backgroundColor: colors.primary,
+                        }}
+                      />
                       <AppText variant="label" style={{ flex: 1 }}>
                         {section.title}
                       </AppText>
@@ -339,20 +412,38 @@ export default function Transactions() {
                       <TransferRow
                         transfer={item.transfer}
                         accounts={accounts}
-                        onPress={() => router.push({ pathname: '/transfer/[id]', params: { id: item.transfer._id } })}
+                        onPress={() =>
+                          router.push({
+                            pathname: '/transfer/view/[id]',
+                            params: { id: item.transfer._id },
+                          })
+                        }
                       />
                     ) : item.kind === 'room' ? (
                       <RoomExpenseRow
                         item={item.room}
                         currency={user.defaultCurrency}
                         category={item.room.categoryId ? byId.get(item.room.categoryId) : undefined}
-                        onPress={() => router.push({ pathname: '/room/[id]/expense-detail', params: { id: item.room.roomId, expenseId: item.room.expenseId } })}
+                        onPress={() =>
+                          router.push({
+                            pathname: '/room/[id]/expense-detail',
+                            params: {
+                              id: item.room.roomId,
+                              expenseId: item.room.expenseId,
+                            },
+                          })
+                        }
                       />
                     ) : (
                       <TransactionRow
                         tx={item.tx}
                         category={byId.get(item.tx.categoryId)}
-                        onPress={() => router.push({ pathname: '/transaction/view/[id]', params: { id: item.tx.clientId } })}
+                        onPress={() =>
+                          router.push({
+                            pathname: '/transaction/view/[id]',
+                            params: { id: item.tx.clientId },
+                          })
+                        }
                       />
                     )}
                   </Appear>
@@ -361,12 +452,20 @@ export default function Transactions() {
             }}
             ListEmptyComponent={
               <View style={{ flex: 1, justifyContent: 'center' }}>
-                <EmptyState icon="text-box-search-outline" title="Nothing is Here" message={type === 'expense' ? 'No expenses this month.' : type === 'income' ? 'No income this month.' : 'No transactions this month.'} />
+                <EmptyState icon={tab === 'transfer' ? 'swap-horizontal' : 'text-box-search-outline'} title="Nothing is Here" message={EMPTY_TEXT[tab]} />
               </View>
             }
           />
         </RevealScope>
-        <Fab label="Add transaction" onPress={() => router.push({ pathname: '/transaction/[id]', params: { id: 'new' } })} />
+        <Fab
+          label="Add transaction"
+          onPress={() =>
+            router.push({
+              pathname: '/transaction/[id]',
+              params: tab === 'all' ? { id: 'new' } : { id: 'new', type: tab },
+            })
+          }
+        />
       </SafeAreaView>
     </View>
   );

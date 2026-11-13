@@ -21,6 +21,7 @@ export const LINK_LABEL: Record<BankTxnLinkKind, string> = {
   transaction: 'Saved as personal',
   room_expense: 'Added to a room',
   room_payment: 'Room payment',
+  transfer: 'Self transfer',
 };
 
 export const bankTxnTitle = (t: BankTransactionDTO) => t.counterparty || (t.direction === 'debit' ? 'Money sent' : 'Money received');

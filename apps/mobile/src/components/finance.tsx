@@ -4,7 +4,7 @@ import { FlatList, Platform, Pressable, ScrollView, TextInput, View } from 'reac
 import { useSafeAreaFrame } from 'react-native-safe-area-context';
 import { formatMoney, getCurrency, type CategoryDTO, type PaymentAccount, type RoomSpendingItemDTO, type TransactionType, type TransferDTO } from '@expense/shared';
 import { UNKNOWN_CATEGORY } from '@/hooks/data';
-import { ACCOUNT_KIND_ICON, accountLabel, endpointLabel } from '@/lib/accounts';
+import { ACCOUNT_KIND_ICON, accountLabel, endpointLabel, type TransferEndpoint } from '@/lib/accounts';
 import { formatDate, formatTime } from '@/lib/dates';
 import type { LocalTransaction } from '@/lib/transactions';
 import { radius, spacing, useTheme } from '@/theme';
@@ -223,7 +223,19 @@ export function CategoryPicker({
   );
 }
 
-export function DateField({ label, value, onChange, maximumDate }: { label: string; value: Date; onChange: (d: Date) => void; maximumDate?: Date }) {
+export function DateField({
+  label,
+  value,
+  onChange,
+  maximumDate,
+  minimumDate,
+}: {
+  label: string;
+  value: Date;
+  onChange: (d: Date) => void;
+  maximumDate?: Date;
+  minimumDate?: Date;
+}) {
   const { colors, dark } = useTheme();
   const box = useFieldBoxStyle();
   const [open, setOpen] = useState(false);
@@ -243,6 +255,7 @@ export function DateField({ label, value, onChange, maximumDate }: { label: stri
           value={value}
           mode="date"
           maximumDate={maximumDate}
+          minimumDate={minimumDate}
           onChange={(event, d) => {
             setOpen(false);
             if (event.type === 'set' && d) {
@@ -265,6 +278,7 @@ export function DateField({ label, value, onChange, maximumDate }: { label: stri
                 themeVariant={dark ? 'dark' : 'light'}
                 accentColor={colors.primary}
                 maximumDate={maximumDate}
+                minimumDate={minimumDate}
                 onChange={(_, d) => d && onChange(d)}
               />
             </ScrollView>
@@ -481,5 +495,48 @@ export function TransferRow({ transfer, accounts, onPress }: { transfer: Transfe
       </View>
       <Money amount={transfer.amount} currency={transfer.currency} variant="body" />
     </Pressable>
+  );
+}
+
+/** Pick one end of a self transfer: a slider of tiles for Cash and each saved bank account / card. */
+export function EndpointPicker({ endpoints, value, onChange }: { endpoints: TransferEndpoint[]; value: string; onChange: (id: string) => void }) {
+  const { colors } = useTheme();
+  return (
+    <ScrollView
+      horizontal
+      nestedScrollEnabled
+      showsHorizontalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+      style={{ flexGrow: 0 }}
+      contentContainerStyle={{ gap: spacing.sm, paddingVertical: spacing.xs }}>
+      {endpoints.map((e) => {
+        const selected = value === e.id;
+        return (
+          <Pressable
+            key={e.id}
+            accessibilityRole="button"
+            accessibilityState={{ selected }}
+            accessibilityLabel={e.label}
+            onPress={() => onChange(e.id)}
+            style={{
+              width: 108,
+              alignItems: 'center',
+              gap: 4,
+              paddingVertical: spacing.sm + 2,
+              paddingHorizontal: spacing.xs,
+              borderRadius: radius.md,
+              borderWidth: 1.5,
+              borderColor: selected ? colors.primary : colors.glassBorder,
+              backgroundColor: selected ? `${colors.primary}1A` : colors.glass,
+              boxShadow: selected ? `0 6px 16px ${colors.primary}33` : undefined,
+            }}>
+            <CategoryIcon icon={e.icon} color={colors.primary} size={36} />
+            <AppText variant="caption" numberOfLines={1} style={{ maxWidth: '100%' }}>
+              {e.label}
+            </AppText>
+          </Pressable>
+        );
+      })}
+    </ScrollView>
   );
 }

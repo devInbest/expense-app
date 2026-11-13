@@ -105,8 +105,8 @@ export const deleteAccount = async (user: UserDoc, req: Request) => {
   await User.updateOne(
     { _id: userId },
     {
-      $set: { status: 'deleted', deletedAt: new Date(), name: '', onboarded: false },
-      $unset: { phone: 1, googleId: 1, email: 1, username: 1, avatarUrl: 1 },
+      $set: { status: 'deleted', deletedAt: new Date(), name: '', onboarded: false, accounts: [] },
+      $unset: { phone: 1, googleId: 1, email: 1, username: 1, avatarUrl: 1, upiId: 1 },
     },
   );
   logActivity({ actorType: 'user', actorId: userId, action: 'user.deleted', req });

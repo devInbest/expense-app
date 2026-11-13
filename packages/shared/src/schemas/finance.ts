@@ -99,6 +99,7 @@ export const createBudgetSchema = z
       .max(5)
       .default([...LIMITS.BUDGET_ALERT_THRESHOLDS]),
     rollover: z.boolean().default(false),
+    note: z.string().trim().max(LIMITS.MAX_BUDGET_NOTE_LENGTH).optional().default(''),
   })
   .refine((b) => b.period !== 'custom' || (b.startDate && b.endDate), {
     message: 'Custom budgets need a start and end date',
@@ -111,6 +112,7 @@ export const updateBudgetSchema = z.object({
   alertThresholds: z.array(z.number().int().min(1).max(200)).max(5).optional(),
   rollover: z.boolean().optional(),
   endDate: dateSchema.optional(),
+  note: z.string().trim().max(LIMITS.MAX_BUDGET_NOTE_LENGTH).optional(),
 });
 
 // ---------- Recurring ----------

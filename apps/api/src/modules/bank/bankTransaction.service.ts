@@ -16,6 +16,7 @@ import { cursorFilter, pageOf } from '../../core/cursor';
 import { logActivity } from '../activity/activity.service';
 import { addExpense, markSharePaid } from '../rooms/expense.service';
 import { createTransaction } from '../transactions/transaction.service';
+import { createTransfer } from '../transfers/transfer.service';
 import type { UserDoc } from '../users/user.model';
 import { BankTransaction, MerchantRule, toBankTransactionDTO, type BankTransactionAttrs } from './bankTransaction.model';
 
@@ -129,6 +130,10 @@ const createLinked = async (
       const upi = paidByMe ? { txnId: doc.reference || undefined, app: doc.bank || undefined } : undefined;
       const roomExpense = await markSharePaid(input.roomId, input.expenseId, input.userId, user, true, req, upi);
       return { link: { kind: 'room_payment', id: input.expenseId, roomId: input.roomId, userId: input.userId }, result: { roomExpense } };
+    }
+    case 'transfer': {
+      const transfer = await createTransfer(user, input.transfer);
+      return { link: { kind: 'transfer', id: transfer._id }, result: { transfer } };
     }
   }
 };

@@ -29,7 +29,7 @@ export default function UpiScreen() {
   };
 
   return (
-    <Screen edges={['bottom']} contentStyle={{ gap: spacing.md, paddingBottom: spacing.lg }}>
+    <Screen edges={['bottom']} contentStyle={{ flexGrow: 1, gap: spacing.md, paddingBottom: spacing.lg }}>
       {!upiId ? (
         <Appear>
           <Card style={{ alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xl }}>
@@ -77,7 +77,9 @@ export default function UpiScreen() {
             </Card>
           </Appear>
 
-          <Button title="Change UPI ID" icon="pencil-outline" variant="glass" color={colors.primary} onPress={() => setEditing(true)} />
+          {/* Pushes the button to the bottom of the screen. */}
+          <View style={{ flex: 1 }} />
+          <Button title="Change UPI ID" variant="glass" color={colors.primary} onPress={() => setEditing(true)} />
         </>
       )}
       <UpiSheet key={String(editing)} visible={editing} onClose={() => setEditing(false)} />
